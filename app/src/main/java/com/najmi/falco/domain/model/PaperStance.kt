@@ -6,5 +6,9 @@ data class PaperStance(
     val actorReasoning: String,
     val confidence: Float,
     val keyEvidence: String,
-    val relevanceScore: Float
+    val relevanceScore: Float,
+    val criticStance: Stance? = null,
+    val criticChallenge: String? = null,
+    val finalStance: Stance? = null,
+    val groundingScore: Float? = null
 )
