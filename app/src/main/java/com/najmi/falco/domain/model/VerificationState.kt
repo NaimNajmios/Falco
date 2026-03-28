@@ -9,6 +9,8 @@ enum class VerificationStage(val label: String) {
     ACTOR_CLASSIFICATION("Classifying paper stances"),
     CRITIC_REVIEW("Reviewing with critic"),
     GROUNDING("Verifying reasoning against abstracts"),
+    RAG_VERIFICATION("Verifying facts against sources"),
+    TEMPORAL_OVERRIDE("Checking temporal consistency"),
     AGGREGATING("Building verdict")
 }
 

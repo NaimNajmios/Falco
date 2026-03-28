@@ -7,6 +7,7 @@ import com.najmi.falco.data.remote.LlmResponse
 import com.najmi.falco.di.ApiKeyProvider
 import com.najmi.falco.domain.model.TokenUsage
 import com.najmi.falco.provider.RateLimitException
+import com.najmi.falco.provider.TokenSteward
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.post
@@ -23,7 +24,7 @@ import javax.inject.Singleton
 
 @Serializable
 data class OpenRouterRequest(
-    val model: String = "google/gemini-2.0-flash-exp:free",
+    val model: String = "meta-llama/llama-3.2-1b-instruct",
     val messages: List<OpenRouterMessage>,
     val temperature: Float = 0.3f,
     @SerialName("max_tokens") val maxTokens: Int = 1024
@@ -62,11 +63,21 @@ data class OpenRouterError(val message: String, val type: String? = null, val co
 class OpenRouterClient @Inject constructor(
     private val httpClient: HttpClient,
     private val json: Json,
-    private val apiKeyProvider: ApiKeyProvider
+    private val apiKeyProvider: ApiKeyProvider,
+    private val tokenSteward: TokenSteward
 ) : LlmClient {
     companion object { private const val TAG = "OpenRouterClient" }
 
+    override suspend fun canMakeRequest(): Boolean {
+        return tokenSteward.hasRequestQuota(LlmProvider.OPENROUTER)
+    }
+
     override suspend fun chat(prompt: String): LlmResponse {
+        if (!canMakeRequest()) {
+            val remaining = tokenSteward.getRemainingTokens(LlmProvider.OPENROUTER)
+            throw RateLimitException("OPENROUTER", "Daily request limit reached. Requests: ${tokenSteward.getRequestLimit(LlmProvider.OPENROUTER)}, Remaining: $remaining")
+        }
+
         val apiKey = apiKeyProvider.getKey(LlmProvider.OPENROUTER)
         Log.d(TAG, "Sending request to OpenRouter, prompt length: ${prompt.length}")
 

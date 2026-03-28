@@ -9,7 +9,6 @@ import com.najmi.falco.domain.repository.IQuotaRepository
 import com.najmi.falco.domain.repository.IVerdictRepository
 import dagger.Binds
 import dagger.Module
-import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton

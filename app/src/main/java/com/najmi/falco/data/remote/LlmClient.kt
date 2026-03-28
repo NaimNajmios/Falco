@@ -9,4 +9,5 @@ data class LlmResponse(
 
 interface LlmClient {
     suspend fun chat(prompt: String): LlmResponse
+    suspend fun canMakeRequest(): Boolean = true
 }

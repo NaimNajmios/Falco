@@ -17,4 +17,5 @@ interface IVerdictRepository {
     suspend fun getByClaimId(claimId: String): Verdict?
     fun getAllVerdicts(): Flow<List<Verdict>>
     fun getRecentClaims(): Flow<List<RecentClaim>>
+    suspend fun deleteClaim(id: String)
 }

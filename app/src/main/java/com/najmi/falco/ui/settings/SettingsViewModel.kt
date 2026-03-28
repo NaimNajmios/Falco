@@ -86,6 +86,8 @@ class SettingsViewModel @Inject constructor(
             LlmProvider.GROQ -> _uiState.value.preferences.userGroqKey ?: ""
             LlmProvider.CEREBRAS -> _uiState.value.preferences.userCerebrasKey ?: ""
             LlmProvider.OPENROUTER -> _uiState.value.preferences.userOpenRouterKey ?: ""
+            LlmProvider.MISTRAL -> _uiState.value.preferences.userMistralKey ?: ""
+            LlmProvider.COHERE -> _uiState.value.preferences.userCohereKey ?: ""
         }
     }
 
@@ -95,6 +97,8 @@ class SettingsViewModel @Inject constructor(
             LlmProvider.GROQ -> !_uiState.value.preferences.userGroqKey.isNullOrBlank()
             LlmProvider.CEREBRAS -> !_uiState.value.preferences.userCerebrasKey.isNullOrBlank()
             LlmProvider.OPENROUTER -> !_uiState.value.preferences.userOpenRouterKey.isNullOrBlank()
+            LlmProvider.MISTRAL -> !_uiState.value.preferences.userMistralKey.isNullOrBlank()
+            LlmProvider.COHERE -> !_uiState.value.preferences.userCohereKey.isNullOrBlank()
         }
     }
 

@@ -7,6 +7,7 @@ import com.najmi.falco.data.remote.LlmResponse
 import com.najmi.falco.di.ApiKeyProvider
 import com.najmi.falco.domain.model.TokenUsage
 import com.najmi.falco.provider.RateLimitException
+import com.najmi.falco.provider.TokenSteward
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.post
@@ -62,10 +63,20 @@ data class GroqError(val message: String, val type: String? = null, val code: St
 class GroqClient @Inject constructor(
     private val httpClient: HttpClient,
     private val json: Json,
-    private val apiKeyProvider: ApiKeyProvider
+    private val apiKeyProvider: ApiKeyProvider,
+    private val tokenSteward: TokenSteward
 ) : LlmClient {
 
+    override suspend fun canMakeRequest(): Boolean {
+        return tokenSteward.hasRequestQuota(LlmProvider.GROQ)
+    }
+
     override suspend fun chat(prompt: String): LlmResponse {
+        if (!canMakeRequest()) {
+            val remaining = tokenSteward.getRemainingTokens(LlmProvider.GROQ)
+            throw RateLimitException("GROQ", "Daily request limit reached. Requests: ${tokenSteward.getRequestLimit(LlmProvider.GROQ)}, Remaining: $remaining")
+        }
+
         val startTime = System.currentTimeMillis()
         val apiKey = apiKeyProvider.getKey(LlmProvider.GROQ)
         DebugLogger.d("[GROQ] Request: prompt=${prompt.length} chars")

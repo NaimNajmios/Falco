@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.security.crypto.EncryptedSharedPreferences
@@ -27,6 +28,7 @@ class UserPreferencesRepository @Inject constructor(
         val DARK_MODE = booleanPreferencesKey("dark_mode")
         val DEBUG_MODE = booleanPreferencesKey("debug_mode")
         val PREFERRED_PROVIDER = stringPreferencesKey("preferred_provider")
+        val KEYS_REVISION = longPreferencesKey("keys_revision")
     }
 
     private val masterKey = MasterKey.Builder(context)
@@ -48,8 +50,10 @@ class UserPreferencesRepository @Inject constructor(
             preferredProvider = prefs[Keys.PREFERRED_PROVIDER] ?: "GROQ",
             userGeminiKey = getEncryptedKey("user_gemini_key"),
             userGroqKey = getEncryptedKey("user_groq_key"),
+            userMistralKey = getEncryptedKey("user_mistral_key"),
+            userCohereKey = getEncryptedKey("user_cohere_key"),
             userCerebrasKey = getEncryptedKey("user_cerebras_key"),
-            userOpenRouterKey = getEncryptedKey("user_open_router_key")
+            userOpenRouterKey = getEncryptedKey("user_openrouter_key")
         )
     }
 
@@ -82,16 +86,21 @@ class UserPreferencesRepository @Inject constructor(
         val keyName = when (provider) {
             LlmProvider.GEMINI -> "user_gemini_key"
             LlmProvider.GROQ -> "user_groq_key"
+            LlmProvider.MISTRAL -> "user_mistral_key"
+            LlmProvider.COHERE -> "user_cohere_key"
             LlmProvider.CEREBRAS -> "user_cerebras_key"
             LlmProvider.OPENROUTER -> "user_openrouter_key"
         }
         setEncryptedKey(keyName, key)
+        context.dataStore.edit { it[Keys.KEYS_REVISION] = System.currentTimeMillis() }
     }
 
     fun getApiKey(provider: LlmProvider): String? {
         return when (provider) {
             LlmProvider.GEMINI -> getEncryptedKey("user_gemini_key")
             LlmProvider.GROQ -> getEncryptedKey("user_groq_key")
+            LlmProvider.MISTRAL -> getEncryptedKey("user_mistral_key")
+            LlmProvider.COHERE -> getEncryptedKey("user_cohere_key")
             LlmProvider.CEREBRAS -> getEncryptedKey("user_cerebras_key")
             LlmProvider.OPENROUTER -> getEncryptedKey("user_openrouter_key")
         }
@@ -100,7 +109,10 @@ class UserPreferencesRepository @Inject constructor(
     suspend fun clearAllUserKeys() {
         setEncryptedKey("user_gemini_key", null)
         setEncryptedKey("user_groq_key", null)
+        setEncryptedKey("user_mistral_key", null)
+        setEncryptedKey("user_cohere_key", null)
         setEncryptedKey("user_cerebras_key", null)
         setEncryptedKey("user_openrouter_key", null)
+        context.dataStore.edit { it[Keys.KEYS_REVISION] = System.currentTimeMillis() }
     }
 }

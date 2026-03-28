@@ -14,12 +14,13 @@ class QueryExpansionAgent @Inject constructor(
 ) : IFalcoAgent<Claim, List<String>> {
 
     override val agentName = "QueryExpansion"
-    override val preferredProvider = LlmProvider.GROQ
+    override val defaultProvider = LlmProvider.GROQ
 
-    override suspend fun execute(claim: Claim): Result<List<String>> {
+    override suspend fun execute(claim: Claim, preferredProvider: LlmProvider?): Result<List<String>> {
+        val provider = preferredProvider ?: defaultProvider
         return try {
             val prompt = buildPrompt(claim)
-            val routeResult = router.routeFor(prompt, preferredProvider)
+            val routeResult = router.routeFor(prompt, provider)
             
             routeResult.fold(
                 onSuccess = { response ->

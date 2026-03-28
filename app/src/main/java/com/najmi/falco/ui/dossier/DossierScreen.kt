@@ -104,7 +104,8 @@ fun DossierScreen(
                 items(uiState.recentClaims) { claim ->
                     HistoryItem(
                         claim = claim,
-                        onClick = { onVerdictSelected(claim.id) }
+                        onClick = { onVerdictSelected(claim.id) },
+                        onDelete = { viewModel.deleteClaim(claim.id) }
                     )
                 }
                 item {
@@ -118,7 +119,8 @@ fun DossierScreen(
 @Composable
 private fun HistoryItem(
     claim: RecentClaim,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDelete: () -> Unit
 ) {
     val stanceColor = claim.lean?.let { lean ->
         when (lean) {
@@ -137,10 +139,10 @@ private fun HistoryItem(
             .padding(16.dp)
     ) {
         Column {
-            Row(
+             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     claim.text.take(40).let { if (claim.text.length > 40) "$it..." else it },
@@ -151,11 +153,20 @@ private fun HistoryItem(
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(Modifier.width(12.dp))
-                claim.lean?.let { lean ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    claim.lean?.let { lean ->
+                        Text(
+                            lean,
+                            style = FalcoTypography.labelSmall.copy(letterSpacing = FalcoDimens.LetterSpacingWide),
+                            color = stanceColor
+                        )
+                        Spacer(Modifier.width(12.dp))
+                    }
                     Text(
-                        lean,
-                        style = FalcoTypography.labelSmall.copy(letterSpacing = FalcoDimens.LetterSpacingWide),
-                        color = stanceColor
+                        "[X]",
+                        style = FalcoTypography.labelSmall,
+                        color = LocalFalcoPalette.current.textGhost,
+                        modifier = Modifier.clickable { onDelete() }
                     )
                 }
             }

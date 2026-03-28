@@ -56,4 +56,10 @@ class DossierViewModel @Inject constructor(
     fun clearSelection() {
         _uiState.value = _uiState.value.copy(selectedVerdict = null)
     }
+
+    fun deleteClaim(id: String) {
+        viewModelScope.launch {
+            verdictRepository.deleteClaim(id)
+        }
+    }
 }

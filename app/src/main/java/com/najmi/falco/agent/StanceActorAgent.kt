@@ -24,12 +24,13 @@ class StanceActorAgent @Inject constructor(
 ) : IFalcoAgent<StanceActorInput, PaperStance> {
 
     override val agentName = "StanceActor"
-    override val preferredProvider = LlmProvider.GROQ
+    override val defaultProvider = LlmProvider.GROQ
 
-    override suspend fun execute(input: StanceActorInput): Result<PaperStance> {
+    override suspend fun execute(input: StanceActorInput, preferredProvider: LlmProvider?): Result<PaperStance> {
+        val provider = preferredProvider ?: defaultProvider
         return try {
             val prompt = buildPrompt(input)
-            val routeResult = router.routeFor(prompt, preferredProvider)
+            val routeResult = router.routeFor(prompt, provider)
             
             routeResult.fold(
                 onSuccess = { response ->

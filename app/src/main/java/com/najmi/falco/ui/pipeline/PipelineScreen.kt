@@ -445,20 +445,15 @@ private fun LiveMonitor() {
 
 @Composable
 private fun FalcoGhostButton(label: String, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth().height(56.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = LocalFalcoPalette.current.bg, contentColor = LocalFalcoPalette.current.textPrimary),
-        shape = FalcoZeroShape
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .background(LocalFalcoPalette.current.bg)
+            .border(1.dp, LocalFalcoPalette.current.textGhost, FalcoZeroShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, LocalFalcoPalette.current.textGhost, FalcoZeroShape)
-                .padding(vertical = 16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(label, style = FalcoTypography.bodySmall)
-        }
+        Text(label, style = FalcoTypography.bodySmall, color = LocalFalcoPalette.current.textPrimary)
     }
 }

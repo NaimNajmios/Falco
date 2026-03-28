@@ -5,5 +5,10 @@ enum class ClaimType {
     COMPARATIVE,
     CAUSAL,
     DEFINITIONAL,
-    STATISTICAL
+    STATISTICAL,
+    SCIENTIFIC,
+    CURRENT_EVENT,
+    PERSON_FACT,
+    QUOTE,
+    GENERAL
 }

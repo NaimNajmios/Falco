@@ -100,4 +100,8 @@ class VerdictRepositoryImpl @Inject constructor(
             }
         }
     }
+
+    override suspend fun deleteClaim(id: String) {
+        claimDao.deleteById(id)
+    }
 }

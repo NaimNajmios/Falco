@@ -5,11 +5,16 @@ import com.najmi.falco.agent.ClaimClassifierAgent
 import com.najmi.falco.agent.QueryExpansionAgent
 import com.najmi.falco.agent.StanceActorAgent
 import com.najmi.falco.agent.StanceCriticAgent
+import com.najmi.falco.data.repository.OutletCredibilityRepository
 import com.najmi.falco.pipeline.AlgorithmicGrounding
 import com.najmi.falco.pipeline.FalcoOrchestrator
 import com.najmi.falco.pipeline.PaperDeduplicator
 import com.najmi.falco.pipeline.PaperQualityGate
+import com.najmi.falco.pipeline.RagVerifier
 import com.najmi.falco.pipeline.TemporalFreshnessAnalyzer
+import com.najmi.falco.pipeline.TemporalOverrideVerifier
+import com.najmi.falco.provider.ActorCriticProviderSelector
+import com.najmi.falco.provider.LlmProviderHealthTracker
 import com.najmi.falco.provider.ProviderRouter
 import com.najmi.falco.provider.TokenSteward
 import dagger.Module
@@ -50,4 +55,22 @@ object AgentModule {
     fun provideTokenSteward(
         quotaRepository: com.najmi.falco.domain.repository.IQuotaRepository
     ): TokenSteward = TokenSteward(quotaRepository)
+
+    @Provides
+    @Singleton
+    fun provideRagVerifier(): RagVerifier = RagVerifier()
+
+    @Provides
+    @Singleton
+    fun provideTemporalOverrideVerifier(): TemporalOverrideVerifier = TemporalOverrideVerifier()
+
+    @Provides
+    @Singleton
+    fun provideActorCriticProviderSelector(
+        healthTracker: LlmProviderHealthTracker
+    ): ActorCriticProviderSelector = ActorCriticProviderSelector(healthTracker)
+
+    @Provides
+    @Singleton
+    fun provideOutletCredibilityRepository(): OutletCredibilityRepository = OutletCredibilityRepository()
 }

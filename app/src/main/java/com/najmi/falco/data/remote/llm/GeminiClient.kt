@@ -7,6 +7,7 @@ import com.najmi.falco.data.remote.LlmResponse
 import com.najmi.falco.di.ApiKeyProvider
 import com.najmi.falco.domain.model.TokenUsage
 import com.najmi.falco.provider.RateLimitException
+import com.najmi.falco.provider.TokenSteward
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.post
@@ -69,11 +70,21 @@ data class GeminiError(val code: String, val message: String, val status: String
 class GeminiClient @Inject constructor(
     private val httpClient: HttpClient,
     private val json: Json,
-    private val apiKeyProvider: ApiKeyProvider
+    private val apiKeyProvider: ApiKeyProvider,
+    private val tokenSteward: TokenSteward
 ) : LlmClient {
     companion object { private const val TAG = "GeminiClient" }
 
+    override suspend fun canMakeRequest(): Boolean {
+        return tokenSteward.hasRequestQuota(LlmProvider.GEMINI)
+    }
+
     override suspend fun chat(prompt: String): LlmResponse {
+        if (!canMakeRequest()) {
+            val remaining = tokenSteward.getRemainingTokens(LlmProvider.GEMINI)
+            throw RateLimitException("GEMINI", "Daily request limit reached. Requests today: ${tokenSteward.getRequestLimit(LlmProvider.GEMINI)}, Remaining: $remaining")
+        }
+
         val apiKey = apiKeyProvider.getKey(LlmProvider.GEMINI)
         Log.d(TAG, "Sending request to Gemini, prompt length: ${prompt.length}")
 

@@ -1,8 +1,9 @@
 package com.najmi.falco.domain.model
 
 enum class FreshnessFlag {
-    CURRENT,
-    AGING,
+    FRESH,
+    RECENT,
     STALE,
+    VERY_OLD,
     UNKNOWN
 }

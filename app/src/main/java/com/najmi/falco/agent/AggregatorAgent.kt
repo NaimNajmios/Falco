@@ -47,12 +47,13 @@ class AggregatorAgent @Inject constructor(
 ) : IFalcoAgent<AggregatorInput, Verdict> {
 
     override val agentName = "Aggregator"
-    override val preferredProvider = LlmProvider.GEMINI
+    override val defaultProvider = LlmProvider.GEMINI
 
-    override suspend fun execute(input: AggregatorInput): Result<Verdict> {
+    override suspend fun execute(input: AggregatorInput, preferredProvider: LlmProvider?): Result<Verdict> {
+        val provider = preferredProvider ?: defaultProvider
         return try {
             val prompt = buildPrompt(input)
-            val routeResult = router.routeFor(prompt, preferredProvider)
+            val routeResult = router.routeFor(prompt, provider)
             
             routeResult.fold(
                 onSuccess = { response ->

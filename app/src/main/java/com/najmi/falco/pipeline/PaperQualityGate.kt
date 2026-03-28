@@ -36,34 +36,35 @@ class PaperQualityGate @Inject constructor() {
         
         val field = paper.fieldsOfStudy.firstOrNull() ?: "Unknown"
         
-        val (agingThreshold, staleThreshold) = when {
+        val (recentThreshold, staleThreshold) = when {
             field.equals("Computer Science", ignoreCase = true) ||
             field.equals("Artificial Intelligence", ignoreCase = true) ||
-            field.equals("Machine Learning", ignoreCase = true) -> Pair(3, 6)
+            field.equals("Machine Learning", ignoreCase = true) -> Pair(1, 3)
             
             field.equals("Medicine", ignoreCase = true) ||
             field.equals("Biology", ignoreCase = true) ||
-            field.equals("Pharmaceutical Sciences", ignoreCase = true) -> Pair(2, 5)
+            field.equals("Pharmaceutical Sciences", ignoreCase = true) -> Pair(1, 2)
             
             field.equals("Physics", ignoreCase = true) ||
-            field.equals("Chemistry", ignoreCase = true) -> Pair(4, 8)
+            field.equals("Chemistry", ignoreCase = true) -> Pair(2, 4)
             
             field.equals("Engineering", ignoreCase = true) ||
-            field.equals("Electronics", ignoreCase = true) -> Pair(4, 8)
+            field.equals("Electronics", ignoreCase = true) -> Pair(2, 4)
             
             field.equals("Social Sciences", ignoreCase = true) ||
-            field.equals("Psychology", ignoreCase = true) -> Pair(5, 10)
+            field.equals("Psychology", ignoreCase = true) -> Pair(3, 5)
             
             field.equals("History", ignoreCase = true) ||
             field.equals("Philosophy", ignoreCase = true) -> Pair(Int.MAX_VALUE, Int.MAX_VALUE)
             
-            else -> Pair(5, 10)
+            else -> Pair(2, 5)
         }
 
         return when {
-            yearsOld >= staleThreshold -> FreshnessFlag.STALE
-            yearsOld >= agingThreshold -> FreshnessFlag.AGING
-            else -> FreshnessFlag.CURRENT
+            yearsOld >= staleThreshold -> FreshnessFlag.VERY_OLD
+            yearsOld >= recentThreshold -> FreshnessFlag.STALE
+            yearsOld > 0 -> FreshnessFlag.RECENT
+            else -> FreshnessFlag.FRESH
         }
     }
 
@@ -76,9 +77,10 @@ class PaperQualityGate @Inject constructor() {
         }
         
         val freshnessWeight = when (freshnessFlag) {
-            FreshnessFlag.CURRENT -> 1.0f
-            FreshnessFlag.AGING -> 0.5f
-            FreshnessFlag.STALE -> 0.2f
+            FreshnessFlag.FRESH -> 1.0f
+            FreshnessFlag.RECENT -> 0.8f
+            FreshnessFlag.STALE -> 0.4f
+            FreshnessFlag.VERY_OLD -> 0.1f
             FreshnessFlag.UNKNOWN -> 0.5f
         }
         
@@ -103,7 +105,7 @@ class PaperQualityGate @Inject constructor() {
     ): Boolean {
         if (paper.abstract.isNullOrBlank() || paper.abstract.length < 80) return false
         if (score < 0.25f) return false
-        if (citationTier == CitationTier.LOW && freshnessFlag == FreshnessFlag.STALE) return false
+        if (citationTier == CitationTier.LOW && (freshnessFlag == FreshnessFlag.STALE || freshnessFlag == FreshnessFlag.VERY_OLD)) return false
         return true
     }
 

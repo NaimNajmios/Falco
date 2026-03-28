@@ -10,5 +10,6 @@ data class PaperStance(
     val criticStance: Stance? = null,
     val criticChallenge: String? = null,
     val finalStance: Stance? = null,
-    val groundingScore: Float? = null
+    val groundingScore: Float? = null,
+    val ragScore: Float? = null
 )

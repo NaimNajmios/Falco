@@ -16,6 +16,8 @@ class ApiKeyProvider @Inject constructor(
         val userKey = when (provider) {
             LlmProvider.GEMINI -> prefs.userGeminiKey
             LlmProvider.GROQ -> prefs.userGroqKey
+            LlmProvider.MISTRAL -> prefs.userMistralKey
+            LlmProvider.COHERE -> prefs.userCohereKey
             LlmProvider.CEREBRAS -> prefs.userCerebrasKey
             LlmProvider.OPENROUTER -> prefs.userOpenRouterKey
         }

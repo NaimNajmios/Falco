@@ -38,4 +38,7 @@ interface ClaimDao {
 
     @Query("DELETE FROM claims WHERE submittedAt < :timestamp")
     suspend fun deleteOlderThan(timestamp: Long)
+
+    @Query("DELETE FROM claims WHERE id = :id")
+    suspend fun deleteById(id: String)
 }

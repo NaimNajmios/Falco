@@ -7,6 +7,7 @@ import com.najmi.falco.data.remote.LlmResponse
 import com.najmi.falco.di.ApiKeyProvider
 import com.najmi.falco.domain.model.TokenUsage
 import com.najmi.falco.provider.RateLimitException
+import com.najmi.falco.provider.TokenSteward
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.post
@@ -25,7 +26,7 @@ import javax.inject.Singleton
 
 @Serializable
 data class CerebrasRequest(
-    val model: String = "llama-3.3-70b",
+    val model: String = "llama-3.1-8b-instant",
     val messages: List<CerebrasMessage>,
     val temperature: Float = 0.3f,
     @SerialName("max_tokens") val maxTokens: Int = 1024
@@ -64,11 +65,21 @@ data class CerebrasError(val message: String, val type: String? = null, val code
 class CerebrasClient @Inject constructor(
     private val httpClient: HttpClient,
     private val json: Json,
-    private val apiKeyProvider: ApiKeyProvider
+    private val apiKeyProvider: ApiKeyProvider,
+    private val tokenSteward: TokenSteward
 ) : LlmClient {
     companion object { private const val TAG = "CerebrasClient" }
 
+    override suspend fun canMakeRequest(): Boolean {
+        return tokenSteward.hasRequestQuota(LlmProvider.CEREBRAS)
+    }
+
     override suspend fun chat(prompt: String): LlmResponse = withContext(Dispatchers.IO) {
+        if (!canMakeRequest()) {
+            val remaining = tokenSteward.getRemainingTokens(LlmProvider.CEREBRAS)
+            throw RateLimitException("CEREBRAS", "Daily request limit reached. Requests: ${tokenSteward.getRequestLimit(LlmProvider.CEREBRAS)}, Remaining: $remaining")
+        }
+
         val apiKey = apiKeyProvider.getKey(LlmProvider.CEREBRAS)
         Log.d(TAG, "Sending request to Cerebras, prompt length: ${prompt.length}")
 

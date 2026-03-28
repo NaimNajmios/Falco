@@ -22,12 +22,13 @@ class StanceCriticAgent @Inject constructor(
 ) : IFalcoAgent<StanceCriticInput, PaperStance> {
 
     override val agentName = "StanceCritic"
-    override val preferredProvider = LlmProvider.GEMINI
+    override val defaultProvider = LlmProvider.GEMINI
 
-    override suspend fun execute(input: StanceCriticInput): Result<PaperStance> {
+    override suspend fun execute(input: StanceCriticInput, preferredProvider: LlmProvider?): Result<PaperStance> {
+        val provider = preferredProvider ?: defaultProvider
         return try {
             val prompt = buildPrompt(input)
-            val routeResult = router.routeFor(prompt, preferredProvider)
+            val routeResult = router.routeFor(prompt, provider)
             
             routeResult.fold(
                 onSuccess = { response ->

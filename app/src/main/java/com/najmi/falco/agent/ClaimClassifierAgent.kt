@@ -23,16 +23,17 @@ class ClaimClassifierAgent @Inject constructor(
 ) : IFalcoAgent<String, Claim> {
 
     override val agentName = "ClaimClassifier"
-    override val preferredProvider = LlmProvider.GROQ
+    override val defaultProvider = LlmProvider.GROQ
 
-    override suspend fun execute(claimText: String): Result<Claim> {
+    override suspend fun execute(claimText: String, preferredProvider: LlmProvider?): Result<Claim> {
+        val provider = preferredProvider ?: defaultProvider
         return try {
             val prompt = buildPrompt(claimText)
-            val routeResult = router.routeFor(prompt, preferredProvider)
+            val routeResult = router.routeFor(prompt, provider)
             
             routeResult.fold(
                 onSuccess = { response ->
-                    Result.success(parseResponse(claimText, response.text))
+                    Result.success(parseResponse(response.text, claimText))
                 },
                 onFailure = { error ->
                     Result.failure(error)
