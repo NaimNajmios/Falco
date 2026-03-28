@@ -20,13 +20,21 @@ FALCO's core is the `FalcoOrchestrator`, which manages a sequence of specialized
 4.  **Stance Actor**: Independently analyzes each paper to determine its stance (Support, Refute, or Neutral) relative to the claim.
 5.  **Aggregator**: Synthesizes all gathered evidence, weighting confidence levels and source quality to produce a final Dossier.
 
+## 🛡 Security & Resilience
+
+FALCO is built for production-grade reliability and data privacy:
+
+-   **Industry-Standard Encryption**: All user API keys are stored using **AES256-GCM/SIV** via `EncryptedSharedPreferences` and Android's `MasterKey` system.
+-   **Resilient LLM Routing**: The `ProviderRouter` implements intelligent fallback logic. If a primary provider (e.g., **Groq**) is unavailable or rate-limited, FALCO automatically routes requests to **Gemini**, then to other configured providers.
+-   **Health Tracking**: Continuous monitoring of provider availability ensures minimal latency and maximum uptime.
+
 ## ✨ Features
 
 -   **Intelligent Hypothesis Analysis**: Depth-first classification of claim types.
 -   **Academic Rigor**: Direct integration with **OpenAlex** and **Semantic Scholar**.
 -   **Dynamic Quota Management**: Real-time token and request tracking via `TokenSteward` across multiple providers (**Gemini**, **Groq**, **Cerebras**, and **OpenRouter**).
 -   **Background Verification**: Support for high-latency tasks using **WorkManager**, ensuring verifications continue even if the app is closed.
--   **Evidence Dossier**: Comprehensive reports containing stances, confidence scores, and source citations.
+-   **Diagnostic Logging**: Integrated `DebugLogger` for real-time orchestration transparency and performance monitoring.
 -   **Premium UI/UX**: A sleek, dark-themed interface built with Jetpack Compose, featuring smooth transitions and edge-to-edge design.
 
 ## 🛠 Tech Stack
@@ -34,6 +42,7 @@ FALCO's core is the `FalcoOrchestrator`, which manages a sequence of specialized
 -   **Language**: Kotlin
 -   **UI Framework**: Jetpack Compose (Material 3)
 -   **Architecture**: Clean Architecture + MVVM + Agent-Oriented Design
+-   **Security**: AndroidX Crypto (EncryptedSharedPreferences)
 -   **Local Storage**: Room (Persistent storage for Dossiers and Quotas)
 -   **Networking**: Ktor (Multiplatform-ready HTTP client)
 -   **Background Tasks**: Android WorkManager
@@ -46,7 +55,6 @@ FALCO's core is the `FalcoOrchestrator`, which manages a sequence of specialized
 
 -   Android Studio Jellyfish or later
 -   JDK 17
--   An API Key for the underlying LLM provider (configured in `local.properties`)
 
 ### Installation
 
@@ -55,9 +63,5 @@ FALCO's core is the `FalcoOrchestrator`, which manages a sequence of specialized
     git clone https://github.com/najminajmi/falco.git
     ```
 2.  Open the project in Android Studio.
-3.  Add your credentials to `local.properties`:
-    ```properties
-    GEMINI_API_KEY=your_api_key_here
-    # Optional: ADD GROQ_API_KEY, CEREBRAS_API_KEY, etc.
-    ```
+3.  **Configure API Keys**: In the app's **Settings**, provide your own keys for the providers you wish to use. These keys are stored securely on your device.
 4.  Build and run on your device or emulator.
