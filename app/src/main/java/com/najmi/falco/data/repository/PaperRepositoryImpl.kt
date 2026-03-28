@@ -1,6 +1,8 @@
 package com.najmi.falco.data.repository
 
+import android.util.Log
 import com.najmi.falco.data.remote.openapi.OpenAlexClient
+import com.najmi.falco.data.remote.semanticscholar.RateLimitException
 import com.najmi.falco.data.remote.semanticscholar.SemanticScholarClient
 import com.najmi.falco.domain.model.Paper
 import com.najmi.falco.domain.repository.IPaperRepository
@@ -17,14 +19,28 @@ class PaperRepositoryImpl @Inject constructor(
     private val deduplicator: PaperDeduplicator
 ) : IPaperRepository {
 
+    companion object {
+        private const val TAG = "PaperRepository"
+    }
+
     override suspend fun search(query: String, limit: Int): List<Paper> {
-        return semanticScholar.searchPapers(query, limit)
+        return try {
+            semanticScholar.searchPapers(query, limit)
+        } catch (e: RateLimitException) {
+            Log.w(TAG, "Semantic Scholar rate limited, using OpenAlex fallback")
+            openAlex.searchPapers(query, limit)
+        }
     }
 
     override suspend fun searchAll(queries: List<String>): List<Paper> = coroutineScope {
         val ssDeferred = async {
-            queries.flatMap { query ->
-                semanticScholar.searchPapers(query, limit = 5)
+            try {
+                queries.flatMap { query ->
+                    semanticScholar.searchPapers(query, limit = 5)
+                }
+            } catch (e: RateLimitException) {
+                Log.w(TAG, "Semantic Scholar rate limited in batch search")
+                emptyList()
             }
         }
         
