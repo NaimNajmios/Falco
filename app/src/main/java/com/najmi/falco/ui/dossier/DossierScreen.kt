@@ -137,6 +137,18 @@ private fun VerdictState(verdict: Verdict, onNewClaim: () -> Unit) {
 
         MetadataBlock(verdict = verdict)
 
+        verdict.temporalWarning?.let { warning ->
+            Spacer(Modifier.height(16.dp))
+            Box(
+                modifier = Modifier.fillMaxWidth()
+                    .background(LocalFalcoPalette.current.surface)
+                    .border(1.dp, LocalFalcoPalette.current.chip, FalcoZeroShape)
+                    .padding(12.dp)
+            ) {
+                Text(warning, style = FalcoTypography.bodySmall, color = LocalFalcoPalette.current.textMuted)
+            }
+        }
+
         Spacer(Modifier.height(24.dp))
 
         Text("Synthesis of grounding data.", style = FalcoTypography.headlineMedium, color = LocalFalcoPalette.current.textPrimary)
@@ -215,11 +227,13 @@ private fun MetaRow(label: String, value: String) {
 @Composable
 private fun EvidenceRow(stance: PaperStance) {
     var expanded by remember { mutableStateOf(false) }
-    val stanceTextColor = when (stance.actorStance) {
+    val finalStance = stance.finalStance ?: stance.actorStance
+    val stanceTextColor = when (finalStance) {
         Stance.SUPPORTS -> LocalFalcoPalette.current.stanceSupports
         Stance.NEUTRAL -> LocalFalcoPalette.current.stanceNeutral
         Stance.OPPOSES -> LocalFalcoPalette.current.stanceOpposes
     }
+    val groundingScore = stance.groundingScore ?: stance.confidence
 
     Column(
         modifier = Modifier
@@ -228,7 +242,7 @@ private fun EvidenceRow(stance: PaperStance) {
             .padding(vertical = 12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("[${stance.actorStance.name}]", style = FalcoTypography.labelSmall, color = stanceTextColor)
+            Text("[${finalStance.name}]", style = FalcoTypography.labelSmall, color = stanceTextColor)
             Spacer(Modifier.width(8.dp))
             Text(
                 stance.paper.title.uppercase().take(50),
@@ -242,7 +256,7 @@ private fun EvidenceRow(stance: PaperStance) {
         Row {
             Spacer(Modifier.width(24.dp))
             Text(
-                "${stance.paper.authors.firstOrNull() ?: "Unknown"}, (${stance.paper.year ?: "N/A"})",
+                "${stance.paper.authors.firstOrNull() ?: "Unknown"}, (${stance.paper.year ?: "N/A"}) · ${stance.paper.citationCount} citations",
                 style = FalcoTypography.labelMedium,
                 color = LocalFalcoPalette.current.textMuted
             )
@@ -253,7 +267,7 @@ private fun EvidenceRow(stance: PaperStance) {
             Text("GROUNDING", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
             Spacer(Modifier.width(8.dp))
             Text(
-                String.format("%.2f", stance.confidence),
+                String.format("%.2f", groundingScore),
                 style = FalcoTypography.bodySmall.copy(fontWeight = FontWeight.Medium),
                 color = LocalFalcoPalette.current.textBody
             )
@@ -268,7 +282,13 @@ private fun EvidenceRow(stance: PaperStance) {
                     .background(LocalFalcoPalette.current.surface)
                     .padding(12.dp)
             ) {
-                Text(stance.actorReasoning, style = FalcoTypography.bodySmall, color = LocalFalcoPalette.current.textMuted)
+                Column {
+                    Text("ACTOR: ${stance.actorReasoning}", style = FalcoTypography.bodySmall, color = LocalFalcoPalette.current.textMuted)
+                    stance.criticChallenge?.let { challenge ->
+                        Spacer(Modifier.height(8.dp))
+                        Text("CRITIC: $challenge", style = FalcoTypography.bodySmall, color = LocalFalcoPalette.current.textGhost)
+                    }
+                }
             }
         }
     }
