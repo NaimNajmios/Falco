@@ -4,8 +4,26 @@ import androidx.room.*
 import com.najmi.falco.data.local.entity.ClaimEntity
 import kotlinx.coroutines.flow.Flow
 
+data class ClaimWithVerdict(
+    val id: String,
+    val text: String,
+    val type: String,
+    val submittedAt: Long,
+    val lean: String?,
+    val confidence: Float?
+)
+
 @Dao
 interface ClaimDao {
+    @Query("""
+        SELECT c.id, c.text, c.type, c.submittedAt, v.lean, v.confidence
+        FROM claims c
+        LEFT JOIN verdicts v ON c.id = v.claimId
+        ORDER BY c.submittedAt DESC
+        LIMIT 10
+    """)
+    fun getRecentClaimsWithVerdicts(): Flow<List<ClaimWithVerdict>>
+
     @Query("SELECT * FROM claims ORDER BY submittedAt DESC")
     fun getAllClaims(): Flow<List<ClaimEntity>>
 

@@ -63,7 +63,7 @@ fun HypothesisScreen(
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
                 Text(
-                    "DETECTED TYPE: EMPIRICAL",
+                    if (inputText.isNotBlank()) "TYPE: CLASSIFYING..." else "TYPE: AWAITING INPUT",
                     style = FalcoTypography.labelSmall,
                     color = LocalFalcoPalette.current.textMuted
                 )
@@ -136,16 +136,21 @@ fun HypothesisScreen(
 
         Spacer(Modifier.height(32.dp))
 
-        Text("RECENT HYPOTHESES", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
-        Spacer(Modifier.height(12.dp))
+        val recentClaimsList by viewModel.recentClaims.collectAsState()
 
-        listOf(
-            "QUANTUM_ENTANGLEMENT_DISCREPANCY_V4" to "VERIFIED",
-            "NEURAL_SYNAPSE_MAPPING_DEVIATION" to "PENDING",
-            "ATMOSPHERIC_CARBON_VALENCE_SHIFT" to "NEW"
-        ).forEach { (name, status) ->
-            RecentHypothesisRow(name = name, status = status)
-            Spacer(Modifier.height(8.dp))
+        if (recentClaimsList.isNotEmpty()) {
+            Text("RECENT HYPOTHESES", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
+            Spacer(Modifier.height(12.dp))
+
+            recentClaimsList.take(5).forEach { claim ->
+                val status = when {
+                    claim.confidence == null -> "PENDING"
+                    claim.confidence >= 0.7f -> "VERIFIED"
+                    else -> "NEW"
+                }
+                RecentHypothesisRow(name = claim.text.take(40).replace(" ", "_"), status = status)
+                Spacer(Modifier.height(8.dp))
+            }
         }
 
         Spacer(Modifier.height(80.dp))

@@ -42,6 +42,7 @@ fun PipelineScreen(
     hypothesisViewModel: HypothesisViewModel
 ) {
     val state by hypothesisViewModel.verificationState.collectAsState()
+    val claimText by hypothesisViewModel.claimText.collectAsState()
 
     Column(
         modifier = Modifier
@@ -53,7 +54,7 @@ fun PipelineScreen(
         Spacer(Modifier.height(48.dp))
 
         Text(
-            "Verifying\nclaim...",
+            claimText.take(30).let { if (claimText.length > 30) "$it..." else it },
             style = FalcoTypography.headlineLarge,
             color = LocalFalcoPalette.current.textPrimary
         )

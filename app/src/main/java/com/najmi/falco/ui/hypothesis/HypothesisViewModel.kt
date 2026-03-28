@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.najmi.falco.domain.model.VerificationState
 import com.najmi.falco.domain.model.Verdict
+import com.najmi.falco.domain.repository.IVerdictRepository
+import com.najmi.falco.domain.repository.RecentClaim
 import com.najmi.falco.domain.usecase.VerifyClaimUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,7 +16,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class HypothesisViewModel @Inject constructor(
-    private val verifyClaimUseCase: VerifyClaimUseCase
+    private val verifyClaimUseCase: VerifyClaimUseCase,
+    private val verdictRepository: IVerdictRepository
 ) : ViewModel() {
 
     val verificationState: StateFlow<VerificationState> = verifyClaimUseCase.verificationState
@@ -27,6 +30,15 @@ class HypothesisViewModel @Inject constructor(
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: String? get() = _errorMessage.value
+
+    val recentClaims: StateFlow<List<RecentClaim>> = verdictRepository.getRecentClaims()
+        .let { flow ->
+            val stateFlow = MutableStateFlow<List<RecentClaim>>(emptyList())
+            viewModelScope.launch {
+                flow.collect { stateFlow.value = it }
+            }
+            stateFlow.asStateFlow()
+        }
 
     fun onTextChanged(text: String) {
         _claimText.value = text
