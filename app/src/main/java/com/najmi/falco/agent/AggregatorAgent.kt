@@ -20,7 +20,12 @@ data class AggregatorInput(
     val claimText: String,
     val claimType: ClaimType,
     val stances: List<PaperStance>,
-    val totalRetrieved: Int
+    val totalRetrieved: Int,
+    val totalPapersPassedGate: Int = stances.size,
+    val temporalWarning: String? = null,
+    val supportingCount: Int = stances.count { it.finalStance == Stance.SUPPORTS },
+    val opposingCount: Int = stances.count { it.finalStance == Stance.OPPOSES },
+    val neutralCount: Int = stances.count { it.finalStance == Stance.NEUTRAL }
 )
 
 @Serializable
@@ -52,7 +57,9 @@ class AggregatorAgent @Inject constructor(
 
     private fun buildPrompt(input: AggregatorInput): String {
         val papersJson = input.stances.joinToString(",\n") { stance ->
-            """{"title": "${escapeJson(stance.paper.title)}","year": ${stance.paper.year ?: "null"},"citationCount": ${stance.paper.citationCount},"stance": "${stance.actorStance.name}","reasoning": "${escapeJson(stance.actorReasoning)}","confidence": ${stance.confidence}}"""
+            val finalStance = stance.finalStance ?: stance.actorStance
+            val groundingScore = stance.groundingScore ?: stance.confidence
+            """{"title": "${escapeJson(stance.paper.title)}","year": ${stance.paper.year ?: "null"},"citationCount": ${stance.paper.citationCount},"stance": "${finalStance.name}","reasoning": "${escapeJson(stance.actorReasoning)}","groundingScore": ${groundingScore}}"""
         }
 
         return """
@@ -63,6 +70,14 @@ class AggregatorAgent @Inject constructor(
 
             CLAIM: "${input.claimText}"
             CLAIM TYPE: ${input.claimType.name}
+            
+            SUMMARY STATS:
+            - Total papers retrieved: ${input.totalRetrieved}
+            - Papers passed quality gate: ${input.totalPapersPassedGate}
+            - Supporting: ${input.supportingCount}
+            - Opposing: ${input.opposingCount}
+            - Neutral: ${input.neutralCount}
+            ${input.temporalWarning?.let { "\n- TEMPORAL WARNING: $it" } ?: ""}
 
             PAPER STANCES:
             [$papersJson]
@@ -92,12 +107,9 @@ class AggregatorAgent @Inject constructor(
             val lean = try { Stance.valueOf(leanStr.uppercase()) } catch (e: Exception) { Stance.NEUTRAL }
             val confidence = parsed["confidence"]?.jsonPrimitive?.floatOrNull?.coerceIn(0f, 1f) ?: 0.5f
             val summary = parsed["summary"]?.jsonPrimitive?.content ?: "Unable to generate summary."
-            val supporting = parsed["supportingCount"]?.jsonPrimitive?.intOrNull
-                ?: input.stances.count { it.actorStance == Stance.SUPPORTS }
-            val opposing = parsed["opposingCount"]?.jsonPrimitive?.intOrNull
-                ?: input.stances.count { it.actorStance == Stance.OPPOSES }
-            val neutral = parsed["neutralCount"]?.jsonPrimitive?.intOrNull
-                ?: input.stances.count { it.actorStance == Stance.NEUTRAL }
+            val supporting = parsed["supportingCount"]?.jsonPrimitive?.intOrNull ?: input.supportingCount
+            val opposing = parsed["opposingCount"]?.jsonPrimitive?.intOrNull ?: input.opposingCount
+            val neutral = parsed["neutralCount"]?.jsonPrimitive?.intOrNull ?: input.neutralCount
             val field = parsed["dominantField"]?.jsonPrimitive?.content
                 ?: input.stances.firstOrNull()?.paper?.fieldsOfStudy?.firstOrNull()
                 ?: "Unknown"
@@ -110,12 +122,12 @@ class AggregatorAgent @Inject constructor(
                 summary = summary,
                 stances = input.stances,
                 totalPapersRetrieved = input.totalRetrieved,
-                totalPapersPassedGate = input.stances.size,
+                totalPapersPassedGate = input.totalPapersPassedGate,
                 supportingCount = supporting,
                 opposingCount = opposing,
                 neutralCount = neutral,
                 dominantField = field,
-                temporalWarning = null
+                temporalWarning = input.temporalWarning
             )
         } catch (e: Exception) {
             Verdict(
@@ -126,12 +138,12 @@ class AggregatorAgent @Inject constructor(
                 summary = "Unable to generate verdict. Please try again.",
                 stances = input.stances,
                 totalPapersRetrieved = input.totalRetrieved,
-                totalPapersPassedGate = input.stances.size,
-                supportingCount = input.stances.count { it.actorStance == Stance.SUPPORTS },
-                opposingCount = input.stances.count { it.actorStance == Stance.OPPOSES },
-                neutralCount = input.stances.count { it.actorStance == Stance.NEUTRAL },
+                totalPapersPassedGate = input.totalPapersPassedGate,
+                supportingCount = input.supportingCount,
+                opposingCount = input.opposingCount,
+                neutralCount = input.neutralCount,
                 dominantField = "Unknown",
-                temporalWarning = null
+                temporalWarning = input.temporalWarning
             )
         }
     }

@@ -2,6 +2,8 @@ package com.najmi.falco.di
 
 import android.util.Log
 import com.najmi.falco.BuildConfig
+import com.najmi.falco.data.remote.openapi.OpenAlexClient
+import com.najmi.falco.data.remote.semanticscholar.SemanticScholarClient
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -68,4 +70,12 @@ object NetworkModule {
     @Provides @Singleton @Named("groq") fun provideGroqApiKey(): String = loadLocalProp("GROQ_API_KEY")
     @Provides @Singleton @Named("cerebras") fun provideCerebrasApiKey(): String = loadLocalProp("CEREBRAS_API_KEY")
     @Provides @Singleton @Named("openrouter") fun provideOpenRouterApiKey(): String = loadLocalProp("OPENROUTER_API_KEY")
+
+    @Provides @Singleton
+    fun provideSemanticScholarClient(httpClient: HttpClient): SemanticScholarClient = 
+        SemanticScholarClient(httpClient)
+
+    @Provides @Singleton
+    fun provideOpenAlexClient(httpClient: HttpClient): OpenAlexClient = 
+        OpenAlexClient(httpClient)
 }
