@@ -64,9 +64,7 @@ private fun FalcoApp() {
     LaunchedEffect(verificationState) {
         when (verificationState) {
             is VerificationState.InProgress -> {
-                if (selectedTab != FalcoTab.Settings) {
-                    selectedTab = FalcoTab.Pipeline
-                }
+                selectedTab = FalcoTab.Pipeline
             }
             is VerificationState.Success -> {
                 if (selectedTab == FalcoTab.Pipeline) {
@@ -78,8 +76,7 @@ private fun FalcoApp() {
                     selectedTab = FalcoTab.Dossier
                 }
             }
-            is VerificationState.Idle -> {
-            }
+            is VerificationState.Idle -> { }
         }
     }
 

@@ -25,7 +25,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.najmi.falco.ui.theme.FalcoBg
+import com.najmi.falco.ui.theme.FalcoDivider
 import com.najmi.falco.ui.theme.FalcoTextGhost
+import com.najmi.falco.ui.theme.FalcoTextMuted
 import com.najmi.falco.ui.theme.FalcoTextPrimary
 import com.najmi.falco.ui.theme.FalcoTypography
 import com.najmi.falco.ui.theme.FalcoZeroShape
@@ -41,14 +43,15 @@ fun FalcoBottomNav(
         modifier = modifier
             .fillMaxWidth()
             .background(FalcoBg)
-            .border(1.dp, FalcoTextGhost.copy(alpha = 0.1f), FalcoZeroShape),
+            .border(1.dp, FalcoDivider, FalcoZeroShape),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         FalcoTab.entries.forEach { tab ->
             val isEnabled = tab in enabledTabs
+            val isSelected = tab == selectedTab
             FalcoNavItem(
                 tab = tab,
-                isSelected = tab == selectedTab,
+                isSelected = isSelected,
                 isEnabled = isEnabled,
                 onClick = { if (isEnabled) onTabSelected(tab) }
             )
@@ -64,10 +67,10 @@ private fun FalcoNavItem(
     onClick: () -> Unit
 ) {
     val activeColor = FalcoTextPrimary
-    val inactiveColor = FalcoTextGhost.copy(alpha = 0.4f)
-    val textColor = if (isSelected) activeColor else inactiveColor
+    val inactiveColor = FalcoTextMuted
+    val textColor = if (!isEnabled) FalcoTextGhost else if (isSelected) activeColor else inactiveColor
     val indicatorColor = if (isSelected) FalcoTextPrimary else Color.Transparent
-    val iconColor = if (isEnabled) (if (isSelected) activeColor else FalcoTextGhost) else FalcoTextGhost.copy(alpha = 0.3f)
+    val iconColor = if (!isEnabled) FalcoTextGhost else if (isSelected) FalcoTextPrimary else FalcoTextMuted
 
     Column(
         modifier = Modifier
@@ -87,7 +90,7 @@ private fun FalcoNavItem(
                 .padding(top = 8.dp)
                 .size(24.dp)
                 .drawBehind {
-                    drawIcon(tab, isSelected, iconColor)
+                    drawIcon(tab, iconColor)
                 }
         )
         Box(
@@ -105,11 +108,9 @@ private fun FalcoNavItem(
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawIcon(
     tab: FalcoTab,
-    isSelected: Boolean,
     color: Color
 ) {
-    val stroke = Stroke(width = 1.5f)
-    val fillColor = if (isSelected) color else Color.Transparent
+    val fillColor = color
 
     when (tab) {
         FalcoTab.Hypothesis -> {
@@ -134,54 +135,10 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawIcon(
         }
         FalcoTab.Settings -> {
             drawCircle(color = color, style = Stroke(width = 1.5f), radius = 6f)
-            drawLine(
-                color = color,
-                start = Offset(0f, -8f),
-                end = Offset(0f, -6f),
-                strokeWidth = 2f
-            )
-            drawLine(
-                color = color,
-                start = Offset(0f, 6f),
-                end = Offset(0f, 8f),
-                strokeWidth = 2f
-            )
-            drawLine(
-                color = color,
-                start = Offset(-8f, 0f),
-                end = Offset(-6f, 0f),
-                strokeWidth = 2f
-            )
-            drawLine(
-                color = color,
-                start = Offset(6f, 0f),
-                end = Offset(8f, 0f),
-                strokeWidth = 2f
-            )
-            drawLine(
-                color = color,
-                start = Offset(-5.6f, -5.6f),
-                end = Offset(-4.2f, -4.2f),
-                strokeWidth = 2f
-            )
-            drawLine(
-                color = color,
-                start = Offset(4.2f, 4.2f),
-                end = Offset(5.6f, 5.6f),
-                strokeWidth = 2f
-            )
-            drawLine(
-                color = color,
-                start = Offset(5.6f, -5.6f),
-                end = Offset(4.2f, -4.2f),
-                strokeWidth = 2f
-            )
-            drawLine(
-                color = color,
-                start = Offset(-4.2f, 4.2f),
-                end = Offset(-5.6f, 5.6f),
-                strokeWidth = 2f
-            )
+            drawLine(color, Offset(-6f, 0f), Offset(-8f, 0f), strokeWidth = 2f)
+            drawLine(color, Offset(6f, 0f), Offset(8f, 0f), strokeWidth = 2f)
+            drawLine(color, Offset(0f, -6f), Offset(0f, -8f), strokeWidth = 2f)
+            drawLine(color, Offset(0f, 6f), Offset(0f, 8f), strokeWidth = 2f)
         }
     }
 }
