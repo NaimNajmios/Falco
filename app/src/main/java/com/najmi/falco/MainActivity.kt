@@ -5,8 +5,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -31,12 +34,11 @@ import com.najmi.falco.ui.navigation.FalcoBottomNav
 import com.najmi.falco.ui.navigation.FalcoTab
 import com.najmi.falco.ui.pipeline.PipelineScreen
 import com.najmi.falco.ui.settings.SettingsScreen
-import com.najmi.falco.ui.theme.FalcoBg
-import com.najmi.falco.ui.theme.FalcoDivider
-import com.najmi.falco.ui.theme.FalcoTextGhost
-import com.najmi.falco.ui.theme.FalcoTextPrimary
-import com.najmi.falco.ui.theme.FalcoTypography
+import com.najmi.falco.ui.settings.SettingsViewModel
+import com.najmi.falco.ui.theme.LocalFalcoPalette
+import com.najmi.falco.ui.theme.FalcoDimens
 import com.najmi.falco.ui.theme.FalcoTheme
+import com.najmi.falco.ui.theme.FalcoTypography
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -45,7 +47,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            FalcoTheme {
+            val settingsViewModel: SettingsViewModel = hiltViewModel()
+            val settingsState by settingsViewModel.uiState.collectAsState()
+            FalcoTheme(isDarkMode = settingsState.preferences.isDarkMode) {
                 FalcoApp()
             }
         }
@@ -87,7 +91,7 @@ private fun FalcoApp() {
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(FalcoBg)) {
+    Column(modifier = Modifier.fillMaxSize().background(LocalFalcoPalette.current.bg)) {
         FalcoHeader()
         Box(modifier = Modifier.weight(1f).fillMaxSize()) {
             when (selectedTab) {
@@ -98,7 +102,7 @@ private fun FalcoApp() {
                     )
                 }
                 FalcoTab.Pipeline -> {
-                    PipelineScreen()
+                    PipelineScreen(hypothesisViewModel = hypothesisViewModel)
                 }
                 FalcoTab.Dossier -> {
                     DossierScreen(
@@ -114,7 +118,7 @@ private fun FalcoApp() {
                 }
             }
         }
-        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(FalcoDivider))
+        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(LocalFalcoPalette.current.divider))
         FalcoBottomNav(
             selectedTab = selectedTab,
             onTabSelected = { tab -> selectedTab = tab },
@@ -128,25 +132,25 @@ private fun FalcoHeader() {
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
-        androidx.compose.foundation.layout.Row(
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 "[□] FALCO",
                 style = FalcoTypography.bodySmall.copy(
-                    letterSpacing = androidx.compose.ui.unit.TextUnit(2.5f, androidx.compose.ui.unit.TextUnitType.Sp),
+                    letterSpacing = FalcoDimens.LetterSpacingHeadline,
                     fontWeight = FontWeight.Medium
                 ),
-                color = FalcoTextPrimary
+                color = LocalFalcoPalette.current.textPrimary
             )
             Text(
                 "v1.0.0_STABLE",
                 style = FalcoTypography.labelSmall,
-                color = FalcoTextGhost
+                color = LocalFalcoPalette.current.textGhost
             )
         }
     }
-    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(FalcoDivider))
+    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(LocalFalcoPalette.current.divider))
 }

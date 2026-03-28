@@ -20,15 +20,10 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.najmi.falco.ui.theme.FalcoBg
-import com.najmi.falco.ui.theme.FalcoDivider
-import com.najmi.falco.ui.theme.FalcoTextGhost
-import com.najmi.falco.ui.theme.FalcoTextMuted
-import com.najmi.falco.ui.theme.FalcoTextPrimary
+import com.najmi.falco.ui.theme.LocalFalcoPalette
 import com.najmi.falco.ui.theme.FalcoTypography
 import com.najmi.falco.ui.theme.FalcoZeroShape
 
@@ -42,8 +37,8 @@ fun FalcoBottomNav(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(FalcoBg)
-            .border(1.dp, FalcoDivider, FalcoZeroShape),
+            .background(LocalFalcoPalette.current.bg)
+            .border(1.dp, LocalFalcoPalette.current.divider, FalcoZeroShape),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         FalcoTab.entries.forEach { tab ->
@@ -66,11 +61,11 @@ private fun FalcoNavItem(
     isEnabled: Boolean,
     onClick: () -> Unit
 ) {
-    val activeColor = FalcoTextPrimary
-    val inactiveColor = FalcoTextMuted
-    val textColor = if (!isEnabled) FalcoTextGhost else if (isSelected) activeColor else inactiveColor
-    val indicatorColor = if (isSelected) FalcoTextPrimary else Color.Transparent
-    val iconColor = if (!isEnabled) FalcoTextGhost else if (isSelected) FalcoTextPrimary else FalcoTextMuted
+    val activeColor = LocalFalcoPalette.current.textPrimary
+    val inactiveColor = LocalFalcoPalette.current.textMuted
+    val textColor = if (!isEnabled) LocalFalcoPalette.current.textGhost else if (isSelected) activeColor else inactiveColor
+    val indicatorColor = if (isSelected) LocalFalcoPalette.current.textPrimary else Color.Transparent
+    val iconColor = if (!isEnabled) LocalFalcoPalette.current.textGhost else if (isSelected) LocalFalcoPalette.current.textPrimary else LocalFalcoPalette.current.textMuted
 
     Column(
         modifier = Modifier

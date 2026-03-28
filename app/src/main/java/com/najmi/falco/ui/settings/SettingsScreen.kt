@@ -30,13 +30,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.najmi.falco.data.remote.LlmProvider
-import com.najmi.falco.ui.theme.FalcoBg
-import com.najmi.falco.ui.theme.FalcoDivider
-import com.najmi.falco.ui.theme.FalcoSurface
-import com.najmi.falco.ui.theme.FalcoTextBody
-import com.najmi.falco.ui.theme.FalcoTextGhost
-import com.najmi.falco.ui.theme.FalcoTextMuted
-import com.najmi.falco.ui.theme.FalcoTextPrimary
+import com.najmi.falco.ui.theme.LocalFalcoPalette
+import com.najmi.falco.ui.theme.FalcoDimens
 import com.najmi.falco.ui.theme.FalcoTypography
 import com.najmi.falco.ui.theme.FalcoZeroShape
 
@@ -50,7 +45,7 @@ fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(FalcoBg)
+            .background(LocalFalcoPalette.current.bg)
             .padding(24.dp)
             .verticalScroll(rememberScrollState())
     ) {
@@ -59,7 +54,7 @@ fun SettingsScreen(
         Text(
             "SYSTEM\nCONFIGURATION",
             style = FalcoTypography.headlineLarge,
-            color = FalcoTextPrimary
+            color = LocalFalcoPalette.current.textPrimary
         )
 
         Spacer(Modifier.height(8.dp))
@@ -68,7 +63,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(1.dp)
-                .background(FalcoDivider)
+                .background(LocalFalcoPalette.current.divider)
         )
 
         Spacer(Modifier.height(32.dp))
@@ -118,12 +113,12 @@ fun SettingsScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(FalcoSurface)
-                .border(1.dp, FalcoDivider, FalcoZeroShape)
+                .background(LocalFalcoPalette.current.surface)
+                .border(1.dp, LocalFalcoPalette.current.divider, FalcoZeroShape)
                 .padding(16.dp)
         ) {
             Column {
-                Text("BUILD INFO", style = FalcoTypography.labelSmall, color = FalcoTextGhost)
+                Text("BUILD INFO", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
                 Spacer(Modifier.height(8.dp))
                 SettingsInfoRow("VERSION", "1.0.0_STABLE")
                 Spacer(Modifier.height(4.dp))
@@ -141,8 +136,8 @@ fun SettingsScreen(
 private fun SettingsSectionHeader(label: String) {
     Text(
         label,
-        style = FalcoTypography.labelSmall.copy(letterSpacing = androidx.compose.ui.unit.TextUnit(2f, androidx.compose.ui.unit.TextUnitType.Sp)),
-        color = FalcoTextGhost
+        style = FalcoTypography.labelSmall.copy(letterSpacing = FalcoDimens.LetterSpacingLabel),
+        color = LocalFalcoPalette.current.textGhost
     )
 }
 
@@ -156,15 +151,15 @@ private fun SettingsToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(FalcoSurface)
-            .border(1.dp, FalcoDivider, FalcoZeroShape)
+            .background(LocalFalcoPalette.current.surface)
+            .border(1.dp, LocalFalcoPalette.current.divider, FalcoZeroShape)
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(label, style = FalcoTypography.bodySmall.copy(fontWeight = FontWeight.Medium), color = FalcoTextPrimary)
+            Text(label, style = FalcoTypography.bodySmall.copy(fontWeight = FontWeight.Medium), color = LocalFalcoPalette.current.textPrimary)
             Spacer(Modifier.height(2.dp))
-            Text(description, style = FalcoTypography.labelMedium, color = FalcoTextGhost)
+            Text(description, style = FalcoTypography.labelMedium, color = LocalFalcoPalette.current.textGhost)
         }
         FalcoSwitch(isChecked = isChecked, onCheckedChange = onCheckedChange)
     }
@@ -183,27 +178,27 @@ private fun SettingsDropdownRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(FalcoSurface)
-            .border(1.dp, FalcoDivider, FalcoZeroShape)
+            .background(LocalFalcoPalette.current.surface)
+            .border(1.dp, LocalFalcoPalette.current.divider, FalcoZeroShape)
             .clickable { expanded = true }
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(label, style = FalcoTypography.bodySmall.copy(fontWeight = FontWeight.Medium), color = FalcoTextPrimary)
+            Text(label, style = FalcoTypography.bodySmall.copy(fontWeight = FontWeight.Medium), color = LocalFalcoPalette.current.textPrimary)
             Spacer(Modifier.height(2.dp))
-            Text(description, style = FalcoTypography.labelMedium, color = FalcoTextGhost)
+            Text(description, style = FalcoTypography.labelMedium, color = LocalFalcoPalette.current.textGhost)
         }
         Box {
             Text(
                 "[$currentValue]",
                 style = FalcoTypography.labelSmall,
-                color = FalcoTextMuted
+                color = LocalFalcoPalette.current.textMuted
             )
             DropdownMenu(
                 expanded = expanded,
                 onDismissRequest = { expanded = false },
-                modifier = Modifier.background(FalcoSurface)
+                modifier = Modifier.background(LocalFalcoPalette.current.surface)
             ) {
                 options.forEach { option ->
                     DropdownMenuItem(
@@ -211,7 +206,7 @@ private fun SettingsDropdownRow(
                             Text(
                                 option,
                                 style = FalcoTypography.bodySmall,
-                                color = if (option == currentValue) FalcoTextPrimary else FalcoTextBody
+                                color = if (option == currentValue) LocalFalcoPalette.current.textPrimary else LocalFalcoPalette.current.textBody
                             )
                         },
                         onClick = {
@@ -234,8 +229,8 @@ private fun FalcoSwitch(
         modifier = Modifier
             .width(40.dp)
             .height(20.dp)
-            .background(if (isChecked) FalcoTextPrimary else FalcoSurface, FalcoZeroShape)
-            .border(1.dp, if (isChecked) FalcoTextPrimary else FalcoTextGhost, FalcoZeroShape)
+            .background(if (isChecked) LocalFalcoPalette.current.textPrimary else LocalFalcoPalette.current.surface, FalcoZeroShape)
+            .border(1.dp, if (isChecked) LocalFalcoPalette.current.textPrimary else LocalFalcoPalette.current.textGhost, FalcoZeroShape)
             .clickable { onCheckedChange(!isChecked) },
         contentAlignment = if (isChecked) Alignment.CenterEnd else Alignment.CenterStart
     ) {
@@ -243,7 +238,7 @@ private fun FalcoSwitch(
             modifier = Modifier
                 .padding(2.dp)
                 .fillMaxSize()
-                .background(if (isChecked) FalcoBg else FalcoTextGhost, FalcoZeroShape)
+                .background(if (isChecked) LocalFalcoPalette.current.bg else LocalFalcoPalette.current.textGhost, FalcoZeroShape)
         )
     }
 }
@@ -254,7 +249,7 @@ private fun SettingsInfoRow(label: String, value: String) {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(label, style = FalcoTypography.labelSmall, color = FalcoTextGhost)
-        Text(value, style = FalcoTypography.labelSmall, color = FalcoTextMuted)
+        Text(label, style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
+        Text(value, style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textMuted)
     }
 }

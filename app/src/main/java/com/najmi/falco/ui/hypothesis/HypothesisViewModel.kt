@@ -20,20 +20,34 @@ class HypothesisViewModel @Inject constructor(
     val verificationState: StateFlow<VerificationState> = verifyClaimUseCase.verificationState
 
     private val _claimText = MutableStateFlow("")
-    val claimText: String get() = _claimText.value
+    val claimText: StateFlow<String> = _claimText.asStateFlow()
 
     private val _currentVerdict = MutableStateFlow<Verdict?>(null)
     val currentVerdict: Verdict? get() = _currentVerdict.value
+
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: String? get() = _errorMessage.value
 
     fun onTextChanged(text: String) {
         _claimText.value = text
     }
 
     fun verify(text: String) {
+        _errorMessage.value = null
         viewModelScope.launch {
             verifyClaimUseCase.execute(text).collect { state ->
-                if (state is VerificationState.Success) {
-                    _currentVerdict.value = state.verdict
+                when (state) {
+                    is VerificationState.Success -> {
+                        _currentVerdict.value = state.verdict
+                    }
+                    is VerificationState.Error -> {
+                        _currentVerdict.value = null
+                        _errorMessage.value = state.message
+                    }
+                    is VerificationState.InProgress -> {
+                        _errorMessage.value = null
+                    }
+                    is VerificationState.Idle -> {}
                 }
             }
         }
@@ -43,5 +57,6 @@ class HypothesisViewModel @Inject constructor(
         verifyClaimUseCase.reset()
         _claimText.value = ""
         _currentVerdict.value = null
+        _errorMessage.value = null
     }
 }

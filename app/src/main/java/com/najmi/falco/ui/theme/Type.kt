@@ -56,6 +56,6 @@ val FalcoTypography = Typography(
     labelMedium = TextStyle(
         fontFamily = IbmPlexMono,
         fontWeight = FontWeight.Normal,
-        fontSize = 9.sp, letterSpacing = 0.5.sp, color = FalcoTextGhost
+        fontSize = 9.sp, letterSpacing = FalcoDimens.LetterSpacingSmall
     )
 )

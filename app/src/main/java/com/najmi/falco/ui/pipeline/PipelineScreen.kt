@@ -27,34 +27,26 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import com.najmi.falco.domain.model.VerificationState
 import com.najmi.falco.domain.model.VerificationStage
-import com.najmi.falco.ui.theme.FalcoBg
-import com.najmi.falco.ui.theme.FalcoBarEmpty
-import com.najmi.falco.ui.theme.FalcoBarFilled
-import com.najmi.falco.ui.theme.FalcoDivider
-import com.najmi.falco.ui.theme.FalcoSurface
-import com.najmi.falco.ui.theme.FalcoTextBody
-import com.najmi.falco.ui.theme.FalcoTextGhost
-import com.najmi.falco.ui.theme.FalcoTextMuted
-import com.najmi.falco.ui.theme.FalcoTextPrimary
+import com.najmi.falco.ui.hypothesis.HypothesisViewModel
+import com.najmi.falco.ui.theme.LocalFalcoPalette
+import com.najmi.falco.ui.theme.FalcoDimens
 import com.najmi.falco.ui.theme.FalcoTypography
 import com.najmi.falco.ui.theme.FalcoZeroShape
 import kotlin.random.Random
 
 @Composable
 fun PipelineScreen(
-    viewModel: PipelineViewModel = hiltViewModel()
+    hypothesisViewModel: HypothesisViewModel
 ) {
-    val state by viewModel.verificationState.collectAsState()
+    val state by hypothesisViewModel.verificationState.collectAsState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(FalcoBg)
+            .background(LocalFalcoPalette.current.bg)
             .padding(24.dp)
             .verticalScroll(rememberScrollState())
     ) {
@@ -63,7 +55,7 @@ fun PipelineScreen(
         Text(
             "Verifying\nclaim...",
             style = FalcoTypography.headlineLarge,
-            color = FalcoTextPrimary
+            color = LocalFalcoPalette.current.textPrimary
         )
 
         Spacer(Modifier.height(24.dp))
@@ -84,10 +76,10 @@ fun PipelineScreen(
 
 @Composable
 private fun StageList(state: VerificationState) {
-    Text("VERIFICATION_STAGES", style = FalcoTypography.labelSmall, color = FalcoTextGhost)
+    Text("VERIFICATION_STAGES", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
     Spacer(Modifier.height(16.dp))
 
-    val allStages = VerificationStage.values().toList()
+    val allStages = VerificationStage.entries
     val currentStage = when (state) {
         is VerificationState.InProgress -> state.stage
         is VerificationState.Success -> allStages.last()
@@ -147,26 +139,26 @@ private fun StageRow(
                 text = icon,
                 style = FalcoTypography.bodyMedium,
                 color = when {
-                    isComplete -> FalcoTextPrimary
-                    isActive -> FalcoTextPrimary.copy(alpha = blinkAlpha)
-                    else -> FalcoTextGhost
+                    isComplete -> LocalFalcoPalette.current.textPrimary
+                    isActive -> LocalFalcoPalette.current.textPrimary.copy(alpha = blinkAlpha)
+                    else -> LocalFalcoPalette.current.textGhost
                 }
             )
         }
         Spacer(Modifier.width(12.dp))
         Text(
             text = label,
-            style = FalcoTypography.bodySmall.copy(letterSpacing = androidx.compose.ui.unit.TextUnit(1.8f, androidx.compose.ui.unit.TextUnitType.Sp)),
-            color = if (isPending) FalcoTextGhost else FalcoTextPrimary,
+            style = FalcoTypography.bodySmall.copy(letterSpacing = FalcoDimens.LetterSpacingWide),
+            color = if (isPending) LocalFalcoPalette.current.textGhost else LocalFalcoPalette.current.textPrimary,
             modifier = Modifier.weight(1f)
         )
         Text(
             text = status,
             style = FalcoTypography.labelSmall,
             color = when {
-                isComplete -> FalcoTextMuted
-                isActive -> FalcoTextPrimary
-                else -> FalcoTextGhost
+                isComplete -> LocalFalcoPalette.current.textMuted
+                isActive -> LocalFalcoPalette.current.textPrimary
+                else -> LocalFalcoPalette.current.textGhost
             }
         )
     }
@@ -174,34 +166,39 @@ private fun StageRow(
 
 @Composable
 private fun RealTimeExtractionPanel(state: VerificationState) {
+    val message = when (state) {
+        is VerificationState.InProgress -> state.message
+        is VerificationState.Success -> null
+        is VerificationState.Error -> state.message
+        is VerificationState.Idle -> "Awaiting input..."
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(FalcoSurface)
-            .border(1.dp, FalcoDivider, FalcoZeroShape)
+            .background(LocalFalcoPalette.current.surface)
+            .border(1.dp, LocalFalcoPalette.current.divider, FalcoZeroShape)
             .padding(16.dp)
     ) {
         Column {
-            Text("REAL-TIME_EXTRACTION", style = FalcoTypography.labelSmall, color = FalcoTextGhost)
+            Text("REAL-TIME_EXTRACTION", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
             Spacer(Modifier.height(12.dp))
 
-            if (state is VerificationState.InProgress) {
-                Text(
-                    "Searching for relevant papers...",
-                    style = FalcoTypography.bodySmall,
-                    color = FalcoTextBody
-                )
-            } else if (state is VerificationState.Success) {
+            if (state is VerificationState.Success) {
                 state.verdict.stances.take(3).forEach { stance ->
                     Text(
                         "REF: ${stance.paper.title.take(50)}",
                         style = FalcoTypography.bodySmall,
-                        color = FalcoTextMuted
+                        color = LocalFalcoPalette.current.textMuted
                     )
                     Spacer(Modifier.height(4.dp))
                 }
             } else {
-                Text("Awaiting input...", style = FalcoTypography.bodySmall, color = FalcoTextGhost)
+                Text(
+                    message ?: "Awaiting input...",
+                    style = FalcoTypography.bodySmall,
+                    color = if (state is VerificationState.Error) LocalFalcoPalette.current.textMuted else LocalFalcoPalette.current.textBody
+                )
             }
         }
     }
@@ -224,15 +221,15 @@ private fun LiveMonitor() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(FalcoSurface)
-            .border(1.dp, FalcoDivider, FalcoZeroShape)
+            .background(LocalFalcoPalette.current.surface)
+            .border(1.dp, LocalFalcoPalette.current.divider, FalcoZeroShape)
             .padding(16.dp)
     ) {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("LIVE MONITOR: NEURAL_LAYER_08", style = FalcoTypography.labelSmall, color = FalcoTextGhost)
+                Text("LIVE MONITOR: NEURAL_LAYER_08", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
                 Spacer(Modifier.weight(1f))
-                Text("■", style = FalcoTypography.labelSmall, color = FalcoTextPrimary)
+                Text("■", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textPrimary)
             }
             Spacer(Modifier.height(12.dp))
 
@@ -243,9 +240,9 @@ private fun LiveMonitor() {
                 bars.forEachIndexed { index, animState ->
                     val height = (animState.value * 32).dp
                     val color = when {
-                        index % 4 == 0 -> FalcoBarFilled
-                        index % 2 == 0 -> FalcoTextMuted
-                        else -> FalcoBarEmpty.copy(alpha = 0.5f)
+                        index % 4 == 0 -> LocalFalcoPalette.current.barFilled
+                        index % 2 == 0 -> LocalFalcoPalette.current.textMuted
+                        else -> LocalFalcoPalette.current.barEmpty.copy(alpha = 0.5f)
                     }
                     Box(
                         modifier = Modifier
@@ -259,9 +256,9 @@ private fun LiveMonitor() {
             Spacer(Modifier.height(8.dp))
 
             Row {
-                Text("SIG.STRENGTH: 0.992  ", style = FalcoTypography.labelMedium, color = FalcoTextGhost)
-                Text("LATENCY: 0.04MS  ", style = FalcoTypography.labelMedium, color = FalcoTextGhost)
-                Text("14.2GB", style = FalcoTypography.labelMedium, color = FalcoTextGhost)
+                Text("SIG.STRENGTH: 0.992  ", style = FalcoTypography.labelMedium, color = LocalFalcoPalette.current.textGhost)
+                Text("LATENCY: 0.04MS  ", style = FalcoTypography.labelMedium, color = LocalFalcoPalette.current.textGhost)
+                Text("14.2GB", style = FalcoTypography.labelMedium, color = LocalFalcoPalette.current.textGhost)
             }
         }
     }

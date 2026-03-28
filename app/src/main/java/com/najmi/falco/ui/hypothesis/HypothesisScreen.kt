@@ -20,33 +20,26 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
-import com.najmi.falco.ui.theme.FalcoBg
-import com.najmi.falco.ui.theme.FalcoDivider
-import com.najmi.falco.ui.theme.FalcoTextBody
-import com.najmi.falco.ui.theme.FalcoTextGhost
-import com.najmi.falco.ui.theme.FalcoTextMuted
-import com.najmi.falco.ui.theme.FalcoTextPrimary
+import com.najmi.falco.ui.theme.LocalFalcoPalette
 import com.najmi.falco.ui.theme.FalcoTypography
 import com.najmi.falco.ui.theme.FalcoZeroShape
 
 @Composable
 fun HypothesisScreen(
-    viewModel: HypothesisViewModel = hiltViewModel(),
+    viewModel: HypothesisViewModel,
     onNavigateToPipeline: () -> Unit
 ) {
     val state by viewModel.verificationState.collectAsState()
-    var inputText by remember { mutableStateOf("") }
+    val inputText by viewModel.claimText.collectAsState()
+    val isInProgress = state is com.najmi.falco.domain.model.VerificationState.InProgress
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(FalcoBg)
+            .background(LocalFalcoPalette.current.bg)
             .padding(24.dp)
             .verticalScroll(rememberScrollState())
     ) {
@@ -55,24 +48,24 @@ fun HypothesisScreen(
         Text(
             "Formalize your\nInquiry",
             style = FalcoTypography.headlineLarge,
-            color = FalcoTextPrimary
+            color = LocalFalcoPalette.current.textPrimary
         )
 
         Spacer(Modifier.height(32.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .border(1.dp, FalcoTextMuted, FalcoZeroShape)
+                    .border(1.dp, LocalFalcoPalette.current.textMuted, FalcoZeroShape)
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
                 Text(
                     "DETECTED TYPE: EMPIRICAL",
                     style = FalcoTypography.labelSmall,
-                    color = FalcoTextMuted
+                    color = LocalFalcoPalette.current.textMuted
                 )
             }
             Spacer(Modifier.weight(1f))
@@ -80,7 +73,7 @@ fun HypothesisScreen(
                 modifier = Modifier
                     .height(1.dp)
                     .padding(start = 12.dp)
-                    .background(FalcoDivider)
+                    .background(LocalFalcoPalette.current.divider)
             )
         }
 
@@ -88,26 +81,26 @@ fun HypothesisScreen(
 
         OutlinedTextField(
             value = inputText,
-            onValueChange = { inputText = it },
+            onValueChange = { viewModel.onTextChanged(it) },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(180.dp),
             placeholder = {
                 Text(
                     "Enter the parameters of your inquiry here...",
-                    color = FalcoTextGhost,
+                    color = LocalFalcoPalette.current.textGhost,
                     style = FalcoTypography.bodyMedium
                 )
             },
             colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = FalcoTextBody,
-                unfocusedTextColor = FalcoTextBody,
-                cursorColor = FalcoTextPrimary,
-                focusedBorderColor = FalcoTextMuted,
-                unfocusedBorderColor = FalcoDivider
+                focusedTextColor = LocalFalcoPalette.current.textBody,
+                unfocusedTextColor = LocalFalcoPalette.current.textBody,
+                cursorColor = LocalFalcoPalette.current.textPrimary,
+                focusedBorderColor = LocalFalcoPalette.current.textMuted,
+                unfocusedBorderColor = LocalFalcoPalette.current.divider
             ),
             textStyle = FalcoTypography.bodyMedium,
-            enabled = state !is com.najmi.falco.domain.model.VerificationState.InProgress
+            enabled = !isInProgress
         )
 
         Spacer(Modifier.height(16.dp))
@@ -117,7 +110,7 @@ fun HypothesisScreen(
             "DOSSIERS IN REAL-TIME. ENSURE TECHNICAL\n" +
             "NOMENCLATURE IS PRECISE FOR OPTIMAL VERIFICATION.",
             style = FalcoTypography.labelSmall,
-            color = FalcoTextGhost,
+            color = LocalFalcoPalette.current.textGhost,
             modifier = Modifier.padding(vertical = 8.dp)
         )
 
@@ -125,17 +118,16 @@ fun HypothesisScreen(
 
         Button(
             onClick = {
-                viewModel.onTextChanged(inputText)
                 viewModel.verify(inputText)
                 onNavigateToPipeline()
             },
             modifier = Modifier.fillMaxWidth().height(56.dp),
-            enabled = inputText.isNotBlank() && state !is com.najmi.falco.domain.model.VerificationState.InProgress,
+            enabled = inputText.isNotBlank() && !isInProgress,
             colors = ButtonDefaults.buttonColors(
-                containerColor = FalcoTextPrimary,
-                contentColor = FalcoBg,
-                disabledContainerColor = FalcoTextGhost,
-                disabledContentColor = FalcoBg
+                containerColor = LocalFalcoPalette.current.textPrimary,
+                contentColor = LocalFalcoPalette.current.bg,
+                disabledContainerColor = LocalFalcoPalette.current.textGhost,
+                disabledContentColor = LocalFalcoPalette.current.bg
             ),
             shape = FalcoZeroShape
         ) {
@@ -144,7 +136,7 @@ fun HypothesisScreen(
 
         Spacer(Modifier.height(32.dp))
 
-        Text("RECENT HYPOTHESES", style = FalcoTypography.labelSmall, color = FalcoTextGhost)
+        Text("RECENT HYPOTHESES", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
         Spacer(Modifier.height(12.dp))
 
         listOf(
@@ -168,22 +160,22 @@ private fun RecentHypothesisRow(name: String, status: String) {
             .border(
                 2.dp,
                 when (status) {
-                    "VERIFIED" -> FalcoTextPrimary
-                    "PENDING" -> FalcoTextMuted
-                    else -> FalcoTextGhost
+                    "VERIFIED" -> LocalFalcoPalette.current.textPrimary
+                    "PENDING" -> LocalFalcoPalette.current.textMuted
+                    else -> LocalFalcoPalette.current.textGhost
                 },
                 FalcoZeroShape
             )
             .padding(14.dp, 12.dp),
-        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(name, style = FalcoTypography.bodySmall, color = FalcoTextBody)
+        Text(name, style = FalcoTypography.bodySmall, color = LocalFalcoPalette.current.textBody)
         Spacer(Modifier.weight(1f))
         Box(
-            modifier = Modifier.border(1.dp, FalcoTextGhost, FalcoZeroShape)
+            modifier = Modifier.border(1.dp, LocalFalcoPalette.current.textGhost, FalcoZeroShape)
                 .padding(horizontal = 8.dp, vertical = 4.dp)
         ) {
-            Text(status, style = FalcoTypography.labelSmall, color = FalcoTextGhost)
+            Text(status, style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
         }
     }
 }
