@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -92,7 +94,7 @@ private fun FalcoApp() {
     }
 
     Column(modifier = Modifier.fillMaxSize().background(LocalFalcoPalette.current.bg)) {
-        FalcoHeader()
+        FalcoHeader(modifier = Modifier.statusBarsPadding())
         Box(modifier = Modifier.weight(1f).fillMaxSize()) {
             when (selectedTab) {
                 FalcoTab.Hypothesis -> {
@@ -120,6 +122,7 @@ private fun FalcoApp() {
         }
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(LocalFalcoPalette.current.divider))
         FalcoBottomNav(
+            modifier = Modifier.navigationBarsPadding(),
             selectedTab = selectedTab,
             onTabSelected = { tab -> selectedTab = tab },
             enabledTabs = enabledTabs
@@ -128,9 +131,9 @@ private fun FalcoApp() {
 }
 
 @Composable
-private fun FalcoHeader() {
+private fun FalcoHeader(modifier: Modifier = Modifier) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp)
+        modifier = modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
