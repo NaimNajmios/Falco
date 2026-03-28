@@ -96,6 +96,7 @@ fun SettingsScreen(
             description = "Default LLM for verification pipeline",
             currentValue = prefs.preferredProvider,
             options = viewModel.providers.map { it.name },
+            enabledOptions = viewModel.providers.filter { viewModel.hasUserKey(it) }.map { it.name },
             onOptionSelected = { name ->
                 viewModel.setPreferredProvider(LlmProvider.valueOf(name))
             }
@@ -103,45 +104,26 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(32.dp))
 
-        SettingsSectionHeader("BYOK - BRING YOUR OWN KEY")
+        SettingsSectionHeader("API KEYS")
 
         Spacer(Modifier.height(12.dp))
 
-        SettingsToggleRow(
-            label = "USE_CUSTOM_KEYS",
-            description = "Use your own API keys instead of defaults",
-            isChecked = prefs.useUserKeys,
-            onCheckedChange = { viewModel.setUseUserKeys(it) }
-        )
-
-        if (prefs.useUserKeys) {
-            Spacer(Modifier.height(16.dp))
-
-            Text(
-                "CONFIGURE API KEYS",
-                style = FalcoTypography.labelSmall,
-                color = LocalFalcoPalette.current.textGhost
+        viewModel.providers.forEach { provider ->
+            ApiKeyInputRow(
+                provider = provider,
+                currentKey = viewModel.getCurrentKey(provider),
+                hasKey = viewModel.hasUserKey(provider),
+                onKeyChange = { key -> viewModel.setUserApiKey(provider, key) }
             )
-
-            Spacer(Modifier.height(12.dp))
-
-            viewModel.providers.forEach { provider ->
-                ApiKeyInputRow(
-                    provider = provider,
-                    currentKey = viewModel.getCurrentKey(provider),
-                    hasKey = viewModel.hasUserKey(provider),
-                    onKeyChange = { key -> viewModel.setUserApiKey(provider, key) }
-                )
-                Spacer(Modifier.height(8.dp))
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            FalcoGhostButton(
-                text = "Clear All Keys",
-                onClick = { viewModel.clearAllKeys() }
-            )
+            Spacer(Modifier.height(8.dp))
         }
+
+        Spacer(Modifier.height(16.dp))
+
+        FalcoGhostButton(
+            text = "Clear All Keys",
+            onClick = { viewModel.clearAllKeys() }
+        )
 
         Spacer(Modifier.height(32.dp))
 
@@ -173,8 +155,6 @@ fun SettingsScreen(
                 SettingsInfoRow("ENV", if (prefs.isDebugMode) "DEBUG" else "PRODUCTION")
                 Spacer(Modifier.height(4.dp))
                 SettingsInfoRow("BUILD", "20260328")
-                Spacer(Modifier.height(4.dp))
-                SettingsInfoRow("BYOK", if (prefs.useUserKeys) "ENABLED" else "DISABLED")
             }
         }
 
@@ -291,6 +271,7 @@ private fun SettingsDropdownRow(
     description: String,
     currentValue: String,
     options: List<String>,
+    enabledOptions: List<String>,
     onOptionSelected: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -313,7 +294,7 @@ private fun SettingsDropdownRow(
             Text(
                 "[$currentValue]",
                 style = FalcoTypography.labelSmall,
-                color = LocalFalcoPalette.current.textMuted
+                color = if (enabledOptions.contains(currentValue)) LocalFalcoPalette.current.textMuted else LocalFalcoPalette.current.textGhost
             )
             DropdownMenu(
                 expanded = expanded,
@@ -321,18 +302,26 @@ private fun SettingsDropdownRow(
                 modifier = Modifier.background(LocalFalcoPalette.current.surface)
             ) {
                 options.forEach { option ->
+                    val isEnabled = enabledOptions.contains(option)
                     DropdownMenuItem(
                         text = {
                             Text(
-                                option,
+                                "$option${if (!isEnabled) " (no key)" else ""}",
                                 style = FalcoTypography.bodySmall,
-                                color = if (option == currentValue) LocalFalcoPalette.current.textPrimary else LocalFalcoPalette.current.textBody
+                                color = when {
+                                    option == currentValue -> LocalFalcoPalette.current.textPrimary
+                                    !isEnabled -> LocalFalcoPalette.current.textGhost
+                                    else -> LocalFalcoPalette.current.textBody
+                                }
                             )
                         },
                         onClick = {
-                            onOptionSelected(option)
-                            expanded = false
-                        }
+                            if (isEnabled) {
+                                onOptionSelected(option)
+                                expanded = false
+                            }
+                        },
+                        enabled = isEnabled
                     )
                 }
             }

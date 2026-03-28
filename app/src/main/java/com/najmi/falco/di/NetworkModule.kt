@@ -1,6 +1,5 @@
 package com.najmi.falco.di
 
-import android.util.Log
 import com.najmi.falco.BuildConfig
 import com.najmi.falco.data.local.DebugLogger
 import com.najmi.falco.data.remote.openapi.OpenAlexClient
@@ -17,28 +16,11 @@ import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
-import java.io.File
-import java.util.Properties
-import javax.inject.Named
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
-
-    private fun loadLocalProp(key: String): String {
-        return try {
-            val props = Properties()
-            val file = File("local.properties")
-            if (file.exists()) {
-                props.load(file.inputStream())
-            }
-            props.getProperty(key, "")
-        } catch (e: Exception) {
-            Log.w("NetworkModule", "Could not load $key from local.properties: ${e.message}")
-            ""
-        }
-    }
 
     @Provides
     @Singleton
@@ -74,11 +56,6 @@ object NetworkModule {
             socketTimeout = 60_000
         }
     }
-
-    @Provides @Singleton @Named("gemini") fun provideGeminiApiKey(): String = loadLocalProp("GEMINI_API_KEY")
-    @Provides @Singleton @Named("groq") fun provideGroqApiKey(): String = loadLocalProp("GROQ_API_KEY")
-    @Provides @Singleton @Named("cerebras") fun provideCerebrasApiKey(): String = loadLocalProp("CEREBRAS_API_KEY")
-    @Provides @Singleton @Named("openrouter") fun provideOpenRouterApiKey(): String = loadLocalProp("OPENROUTER_API_KEY")
 
     @Provides @Singleton
     fun provideSemanticScholarClient(httpClient: HttpClient): SemanticScholarClient = 

@@ -62,12 +62,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun setUseUserKeys(enabled: Boolean) {
-        viewModelScope.launch {
-            userPreferencesRepository.setUseUserKeys(enabled)
-        }
-    }
-
     fun setUserApiKey(provider: LlmProvider, key: String) {
         viewModelScope.launch {
             if (key.isBlank()) {

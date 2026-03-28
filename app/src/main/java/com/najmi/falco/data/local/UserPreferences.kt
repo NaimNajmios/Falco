@@ -4,7 +4,6 @@ data class UserPreferences(
     val isDarkMode: Boolean = true,
     val isDebugMode: Boolean = false,
     val preferredProvider: String = "GROQ",
-    val useUserKeys: Boolean = false,
     val userGeminiKey: String? = null,
     val userGroqKey: String? = null,
     val userCerebrasKey: String? = null,

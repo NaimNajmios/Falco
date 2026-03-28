@@ -27,7 +27,6 @@ class UserPreferencesRepository @Inject constructor(
         val DARK_MODE = booleanPreferencesKey("dark_mode")
         val DEBUG_MODE = booleanPreferencesKey("debug_mode")
         val PREFERRED_PROVIDER = stringPreferencesKey("preferred_provider")
-        val USE_USER_KEYS = booleanPreferencesKey("use_user_keys")
     }
 
     private val masterKey = MasterKey.Builder(context)
@@ -47,11 +46,10 @@ class UserPreferencesRepository @Inject constructor(
             isDarkMode = prefs[Keys.DARK_MODE] ?: true,
             isDebugMode = prefs[Keys.DEBUG_MODE] ?: false,
             preferredProvider = prefs[Keys.PREFERRED_PROVIDER] ?: "GROQ",
-            useUserKeys = prefs[Keys.USE_USER_KEYS] ?: false,
             userGeminiKey = getEncryptedKey("user_gemini_key"),
             userGroqKey = getEncryptedKey("user_groq_key"),
             userCerebrasKey = getEncryptedKey("user_cerebras_key"),
-            userOpenRouterKey = getEncryptedKey("user_openrouter_key")
+            userOpenRouterKey = getEncryptedKey("user_open_router_key")
         )
     }
 
@@ -80,10 +78,6 @@ class UserPreferencesRepository @Inject constructor(
         context.dataStore.edit { it[Keys.PREFERRED_PROVIDER] = provider }
     }
 
-    suspend fun setUseUserKeys(enabled: Boolean) {
-        context.dataStore.edit { it[Keys.USE_USER_KEYS] = enabled }
-    }
-
     suspend fun setUserApiKey(provider: LlmProvider, key: String?) {
         val keyName = when (provider) {
             LlmProvider.GEMINI -> "user_gemini_key"
@@ -108,6 +102,5 @@ class UserPreferencesRepository @Inject constructor(
         setEncryptedKey("user_groq_key", null)
         setEncryptedKey("user_cerebras_key", null)
         setEncryptedKey("user_openrouter_key", null)
-        setUseUserKeys(false)
     }
 }
