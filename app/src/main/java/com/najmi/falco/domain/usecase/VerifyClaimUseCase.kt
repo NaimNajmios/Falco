@@ -21,4 +21,8 @@ class VerifyClaimUseCase @Inject constructor(
         orchestrator.verify(claimText).onEach { state ->
             _verificationState.value = state
         }
+
+    fun reset() {
+        _verificationState.value = VerificationState.Idle
+    }
 }

@@ -38,7 +38,7 @@ import com.najmi.falco.ui.theme.FalcoZeroShape
 @Composable
 fun HypothesisScreen(
     viewModel: HypothesisViewModel = hiltViewModel(),
-    onNavigateToDossier: () -> Unit
+    onNavigateToPipeline: () -> Unit
 ) {
     val state by viewModel.verificationState.collectAsState()
     var inputText by remember { mutableStateOf("") }
@@ -127,7 +127,7 @@ fun HypothesisScreen(
             onClick = {
                 viewModel.onTextChanged(inputText)
                 viewModel.verify(inputText)
-                onNavigateToDossier()
+                onNavigateToPipeline()
             },
             modifier = Modifier.fillMaxWidth().height(56.dp),
             enabled = inputText.isNotBlank() && state !is com.najmi.falco.domain.model.VerificationState.InProgress,

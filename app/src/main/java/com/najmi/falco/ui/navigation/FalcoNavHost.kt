@@ -21,7 +21,7 @@ fun FalcoNavHost(
     ) {
         composable(FalcoTab.Hypothesis.route) {
             HypothesisScreen(
-                onNavigateToDossier = { onTabSelected(FalcoTab.Dossier) }
+                onNavigateToPipeline = { onTabSelected(FalcoTab.Pipeline) }
             )
         }
         composable(FalcoTab.Pipeline.route) {

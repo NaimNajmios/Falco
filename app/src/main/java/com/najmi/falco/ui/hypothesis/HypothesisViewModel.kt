@@ -40,6 +40,7 @@ class HypothesisViewModel @Inject constructor(
     }
 
     fun reset() {
+        verifyClaimUseCase.reset()
         _claimText.value = ""
         _currentVerdict.value = null
     }
