@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -31,8 +33,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.najmi.falco.data.local.DebugLogger
+import com.najmi.falco.domain.model.Stance
 import com.najmi.falco.domain.model.VerificationState
 import com.najmi.falco.domain.model.VerificationStage
 import com.najmi.falco.ui.hypothesis.HypothesisViewModel
@@ -40,11 +44,13 @@ import com.najmi.falco.ui.theme.LocalFalcoPalette
 import com.najmi.falco.ui.theme.FalcoDimens
 import com.najmi.falco.ui.theme.FalcoTypography
 import com.najmi.falco.ui.theme.FalcoZeroShape
+import kotlin.math.roundToInt
 import kotlin.random.Random
 
 @Composable
 fun PipelineScreen(
-    hypothesisViewModel: HypothesisViewModel
+    hypothesisViewModel: HypothesisViewModel,
+    onNewClaim: () -> Unit
 ) {
     val state by hypothesisViewModel.verificationState.collectAsState()
     val claimText by hypothesisViewModel.claimText.collectAsState()
@@ -66,17 +72,151 @@ fun PipelineScreen(
 
         Spacer(Modifier.height(24.dp))
 
-        StageList(state = state)
+        when (state) {
+            is VerificationState.Success -> {
+                VerdictResult(state = state as VerificationState.Success, onNewClaim = onNewClaim)
+            }
+            is VerificationState.Error -> {
+                ErrorResult(state = state as VerificationState.Error, onNewClaim = onNewClaim)
+            }
+            else -> {
+                StageList(state = state)
 
-        Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(24.dp))
 
-        RealTimeExtractionPanel(state = state)
+                RealTimeExtractionPanel(state = state)
 
+                Spacer(Modifier.height(16.dp))
+
+                LiveMonitor()
+
+                Spacer(Modifier.height(32.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun VerdictResult(
+    state: VerificationState.Success,
+    onNewClaim: () -> Unit
+) {
+    val verdict = state.verdict
+    val stanceColor = when (verdict.lean) {
+        Stance.SUPPORTS -> LocalFalcoPalette.current.stanceSupports
+        Stance.NEUTRAL -> LocalFalcoPalette.current.stanceNeutral
+        Stance.OPPOSES -> LocalFalcoPalette.current.stanceOpposes
+    }
+    val confidencePct = (verdict.confidence * 100).roundToInt()
+
+    Text("VERIFICATION COMPLETE", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
+    Spacer(Modifier.height(16.dp))
+
+    Text(verdict.lean.name, style = FalcoTypography.displayLarge, color = stanceColor)
+    Spacer(Modifier.height(8.dp))
+
+    Text("$confidencePct%  CONFIDENCE", style = FalcoTypography.headlineSmall, color = LocalFalcoPalette.current.textBody)
+    Spacer(Modifier.height(8.dp))
+
+    ConfidenceSegmentBar(confidence = verdict.confidence)
+
+    Spacer(Modifier.height(16.dp))
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(LocalFalcoPalette.current.surface)
+            .border(1.dp, LocalFalcoPalette.current.divider, FalcoZeroShape)
+            .padding(16.dp)
+    ) {
+        Column {
+            Text("SUMMARY", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
+            Spacer(Modifier.height(8.dp))
+            Text(verdict.summary, style = FalcoTypography.bodySmall, color = LocalFalcoPalette.current.textBody)
+        }
+    }
+
+    Spacer(Modifier.height(16.dp))
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        MetaChip("EVIDENCE", "${verdict.stances.size} PAPERS")
+        MetaChip("SUPPORT", "${verdict.supportingCount}")
+        MetaChip("OPPOSE", "${verdict.opposingCount}")
+    }
+
+    verdict.temporalWarning?.let { warning ->
         Spacer(Modifier.height(16.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(LocalFalcoPalette.current.surface)
+                .border(1.dp, LocalFalcoPalette.current.chip, FalcoZeroShape)
+                .padding(12.dp)
+        ) {
+            Text(warning, style = FalcoTypography.bodySmall, color = LocalFalcoPalette.current.textMuted)
+        }
+    }
 
-        LiveMonitor()
+    Spacer(Modifier.height(32.dp))
 
-        Spacer(Modifier.height(32.dp))
+    FalcoGhostButton("NEW CLAIM", onClick = onNewClaim)
+    Spacer(Modifier.height(80.dp))
+}
+
+@Composable
+private fun ErrorResult(
+    state: VerificationState.Error,
+    onNewClaim: () -> Unit
+) {
+    Text("VERIFICATION FAILED", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
+    Spacer(Modifier.height(16.dp))
+
+    Text("UNVERIFIABLE", style = FalcoTypography.displayLarge, color = LocalFalcoPalette.current.textGhost)
+    Spacer(Modifier.height(24.dp))
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(LocalFalcoPalette.current.surface)
+            .border(1.dp, LocalFalcoPalette.current.divider, FalcoZeroShape)
+            .padding(16.dp)
+    ) {
+        Text(state.message, style = FalcoTypography.bodySmall, color = LocalFalcoPalette.current.textMuted)
+    }
+
+    Spacer(Modifier.height(32.dp))
+
+    FalcoGhostButton("TRY AGAIN", onClick = onNewClaim)
+    Spacer(Modifier.height(80.dp))
+}
+
+@Composable
+private fun MetaChip(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
+        Spacer(Modifier.height(4.dp))
+        Text(value, style = FalcoTypography.bodySmall.copy(fontWeight = FontWeight.Medium), color = LocalFalcoPalette.current.textBody)
+    }
+}
+
+@Composable
+private fun ConfidenceSegmentBar(confidence: Float, segments: Int = 13) {
+    val filled = (confidence * segments).roundToInt()
+    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        repeat(segments) { i ->
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(3.dp)
+                    .background(
+                        if (i < filled) LocalFalcoPalette.current.barFilled else LocalFalcoPalette.current.barEmpty,
+                        FalcoZeroShape
+                    )
+            )
+        }
     }
 }
 
@@ -299,6 +439,26 @@ private fun LiveMonitor() {
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun FalcoGhostButton(label: String, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().height(56.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = LocalFalcoPalette.current.bg, contentColor = LocalFalcoPalette.current.textPrimary),
+        shape = FalcoZeroShape
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, LocalFalcoPalette.current.textGhost, FalcoZeroShape)
+                .padding(vertical = 16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(label, style = FalcoTypography.bodySmall)
         }
     }
 }

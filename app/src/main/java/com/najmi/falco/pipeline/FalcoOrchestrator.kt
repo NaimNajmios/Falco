@@ -17,6 +17,8 @@ import com.najmi.falco.domain.model.VerificationStage
 import com.najmi.falco.domain.model.VerificationState
 import com.najmi.falco.domain.repository.IPaperRepository
 import com.najmi.falco.domain.repository.IVerdictRepository
+import com.najmi.falco.provider.AllProvidersFailedException
+import com.najmi.falco.provider.RateLimitException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
@@ -44,12 +46,24 @@ class FalcoOrchestrator @Inject constructor(
             var stageStart: Long
             stageStart = System.currentTimeMillis()
             send(VerificationState.InProgress(VerificationStage.CLASSIFYING, "Identifying claim type..."))
-            val claim = claimClassifier.execute(claimText)
+            
+            val claimResult = claimClassifier.execute(claimText)
+            val claim = claimResult.getOrElse { e ->
+                DebugLogger.e("[PIPELINE] Claim classification failed: ${e.message}")
+                send(VerificationState.Error(VerificationStage.CLASSIFYING, "Failed to classify claim: ${getUserFriendlyError(e)}"))
+                return@channelFlow
+            }
             DebugLogger.stage("CLASSIFYING", System.currentTimeMillis() - stageStart)
 
             stageStart = System.currentTimeMillis()
             send(VerificationState.InProgress(VerificationStage.EXPANDING_QUERIES, "Generating academic search queries..."))
-            val queries = queryExpander.execute(claim)
+            
+            val queriesResult = queryExpander.execute(claim)
+            val queries = queriesResult.getOrElse { e ->
+                DebugLogger.e("[PIPELINE] Query expansion failed: ${e.message}")
+                send(VerificationState.Error(VerificationStage.EXPANDING_QUERIES, "Failed to generate queries: ${getUserFriendlyError(e)}"))
+                return@channelFlow
+            }
             DebugLogger.stage("EXPANDING_QUERIES", System.currentTimeMillis() - stageStart)
 
             stageStart = System.currentTimeMillis()
@@ -92,16 +106,38 @@ class FalcoOrchestrator @Inject constructor(
 
             stageStart = System.currentTimeMillis()
             send(VerificationState.InProgress(VerificationStage.ACTOR_CLASSIFICATION, "Classifying stances across ${analyzedPapers.size} papers..."))
-            val actorStances: List<PaperStance> = analyzedPapers.map { qualityPaper ->
+            
+            val actorResults = analyzedPapers.map { qualityPaper ->
                 async { stanceActor.execute(StanceActorInput(claim.text, qualityPaper.paper)) }
-            }.awaitAll().filter { it.confidence > 0.3f }
+            }.awaitAll()
+            
+            val actorFailures = actorResults.count { it.isFailure }
+            if (actorFailures > 0) {
+                DebugLogger.w("[PIPELINE] ${actorFailures}/${actorResults.size} stance classifications failed")
+            }
+            
+            val actorStances: List<PaperStance> = actorResults
+                .mapNotNull { it.getOrNull() }
+                .filter { it.confidence > 0.3f }
+            
+            if (actorStances.isEmpty()) {
+                send(VerificationState.Error(VerificationStage.ACTOR_CLASSIFICATION, "All paper stance classifications failed. Check your API keys or try again later."))
+                return@channelFlow
+            }
+            
             DebugLogger.stage("ACTOR_CLASSIFICATION (${actorStances.size} stances)", System.currentTimeMillis() - stageStart)
 
             stageStart = System.currentTimeMillis()
             send(VerificationState.InProgress(VerificationStage.CRITIC_REVIEW, "Critic reviewing stances..."))
-            val criticStances = actorStances.map { actorStance ->
-                stanceCritic.execute(StanceCriticInput(claim.text, actorStance))
+            
+            val criticResults = actorStances.map { stanceCritic.execute(StanceCriticInput(claim.text, it)) }
+            
+            val criticFailures = criticResults.count { it.isFailure }
+            if (criticFailures > 0) {
+                DebugLogger.w("[PIPELINE] ${criticFailures}/${criticResults.size} critic reviews failed")
             }
+            
+            val criticStances = criticResults.mapNotNull { it.getOrNull() }
             DebugLogger.stage("CRITIC_REVIEW", System.currentTimeMillis() - stageStart)
 
             stageStart = System.currentTimeMillis()
@@ -115,20 +151,25 @@ class FalcoOrchestrator @Inject constructor(
             val opposingCount = groundedStances.count { it.finalStance == Stance.OPPOSES }
             val neutralCount = groundedStances.count { it.finalStance == Stance.NEUTRAL }
 
-            val verdict = aggregator.execute(
-                AggregatorInput(
-                    claimId = claim.id,
-                    claimText = claim.text,
-                    claimType = claim.type,
-                    stances = groundedStances,
-                    totalRetrieved = papers.size,
-                    totalPapersPassedGate = analyzedPapers.size,
-                    temporalWarning = temporalWarning,
-                    supportingCount = supportingCount,
-                    opposingCount = opposingCount,
-                    neutralCount = neutralCount
-                )
+            val aggregatorInput = AggregatorInput(
+                claimId = claim.id,
+                claimText = claim.text,
+                claimType = claim.type,
+                stances = groundedStances,
+                totalRetrieved = papers.size,
+                totalPapersPassedGate = analyzedPapers.size,
+                temporalWarning = temporalWarning,
+                supportingCount = supportingCount,
+                opposingCount = opposingCount,
+                neutralCount = neutralCount
             )
+            
+            val verdictResult = aggregator.execute(aggregatorInput)
+            val verdict = verdictResult.getOrElse { e ->
+                DebugLogger.e("[PIPELINE] Aggregation failed: ${e.message}")
+                send(VerificationState.Error(VerificationStage.AGGREGATING, "Failed to build verdict: ${getUserFriendlyError(e)}"))
+                return@channelFlow
+            }
 
             verdictRepo.save(verdict)
             DebugLogger.stage("AGGREGATING", System.currentTimeMillis() - stageStart)
@@ -138,6 +179,14 @@ class FalcoOrchestrator @Inject constructor(
         } catch (e: Exception) {
             DebugLogger.e("[PIPELINE] Failed: ${e.message}")
             send(VerificationState.Error(null, e.message ?: "Verification failed"))
+        }
+    }
+    
+    private fun getUserFriendlyError(error: Throwable): String {
+        return when (error) {
+            is AllProvidersFailedException -> "All AI providers failed. Please check your API keys in Settings."
+            is RateLimitException -> "Rate limit exceeded. Please wait a moment and try again."
+            else -> error.message ?: "An unexpected error occurred"
         }
     }
 }

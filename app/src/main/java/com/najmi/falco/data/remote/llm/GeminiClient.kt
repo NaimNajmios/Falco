@@ -6,6 +6,7 @@ import com.najmi.falco.data.remote.LlmProvider
 import com.najmi.falco.data.remote.LlmResponse
 import com.najmi.falco.di.ApiKeyProvider
 import com.najmi.falco.domain.model.TokenUsage
+import com.najmi.falco.provider.RateLimitException
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.post
@@ -83,6 +84,11 @@ class GeminiClient @Inject constructor(
             setBody(GeminiRequest(
                 contents = listOf(GeminiContent(parts = listOf(GeminiPart(text = prompt))))
             ))
+        }
+
+        if (response.status == HttpStatusCode.TooManyRequests) {
+            Log.e(TAG, "Gemini rate limit exceeded")
+            throw RateLimitException("GEMINI")
         }
 
         if (response.status != HttpStatusCode.OK) {

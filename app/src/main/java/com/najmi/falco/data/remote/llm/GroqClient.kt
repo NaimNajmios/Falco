@@ -6,6 +6,7 @@ import com.najmi.falco.data.remote.LlmProvider
 import com.najmi.falco.data.remote.LlmResponse
 import com.najmi.falco.di.ApiKeyProvider
 import com.najmi.falco.domain.model.TokenUsage
+import com.najmi.falco.provider.RateLimitException
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.post
@@ -78,6 +79,11 @@ class GroqClient @Inject constructor(
         val latency = System.currentTimeMillis() - startTime
         val status = response.status
         val responseBody = response.bodyAsText()
+
+        if (status == HttpStatusCode.TooManyRequests) {
+            DebugLogger.e("[GROQ] Rate limit exceeded")
+            throw RateLimitException("GROQ")
+        }
 
         if (status != HttpStatusCode.OK) {
             DebugLogger.e("[GROQ] Error ($status): ${responseBody.take(100)}")

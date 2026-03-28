@@ -24,10 +24,22 @@ class StanceCriticAgent @Inject constructor(
     override val agentName = "StanceCritic"
     override val preferredProvider = LlmProvider.GEMINI
 
-    override suspend fun execute(input: StanceCriticInput): PaperStance {
-        val prompt = buildPrompt(input)
-        val response = router.routeFor(prompt, preferredProvider)
-        return parseResponse(response.text, input.paperStance)
+    override suspend fun execute(input: StanceCriticInput): Result<PaperStance> {
+        return try {
+            val prompt = buildPrompt(input)
+            val routeResult = router.routeFor(prompt, preferredProvider)
+            
+            routeResult.fold(
+                onSuccess = { response ->
+                    Result.success(parseResponse(response.text, input.paperStance))
+                },
+                onFailure = { error ->
+                    Result.failure(error)
+                }
+            )
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     private fun buildPrompt(input: StanceCriticInput): String {

@@ -26,10 +26,22 @@ class StanceActorAgent @Inject constructor(
     override val agentName = "StanceActor"
     override val preferredProvider = LlmProvider.GROQ
 
-    override suspend fun execute(input: StanceActorInput): PaperStance {
-        val prompt = buildPrompt(input)
-        val response = router.routeFor(prompt, preferredProvider)
-        return parseResponse(response.text, input.paper)
+    override suspend fun execute(input: StanceActorInput): Result<PaperStance> {
+        return try {
+            val prompt = buildPrompt(input)
+            val routeResult = router.routeFor(prompt, preferredProvider)
+            
+            routeResult.fold(
+                onSuccess = { response ->
+                    Result.success(parseResponse(response.text, input.paper))
+                },
+                onFailure = { error ->
+                    Result.failure(error)
+                }
+            )
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     private fun buildPrompt(input: StanceActorInput) = """

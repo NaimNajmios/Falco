@@ -16,44 +16,53 @@ class ProviderRouter @Inject constructor(
 ) {
     companion object { private const val TAG = "ProviderRouter" }
 
-    private suspend fun tryProvider(provider: LlmProvider, prompt: String): LlmResponse? {
-        val client = clients[provider] ?: return null
-        if (!healthTracker.isAvailable(provider)) return null
+    private suspend fun tryProvider(provider: LlmProvider, prompt: String): Result<LlmResponse> {
+        val client = clients[provider] ?: return Result.failure(NoSuchElementException("No client for ${provider.name}"))
+        if (!healthTracker.isAvailable(provider)) {
+            return Result.failure(IllegalStateException("${provider.name} is not available"))
+        }
         if (!apiKeyProvider.hasUserKey(provider)) {
             Log.w(TAG, "Provider ${provider.name} has no API key configured")
-            return null
+            return Result.failure(NoSuchElementException("${provider.name} has no API key configured"))
         }
 
         return try {
-            client.chat(prompt)
+            val response = client.chat(prompt)
+            Result.success(response)
         } catch (e: Exception) {
             Log.e(TAG, "Provider ${provider.name} failed: ${e.message}")
             healthTracker.reportError(provider.name)
-            null
+            Result.failure(e)
         }
     }
 
-    suspend fun routeFor(prompt: String, preferred: LlmProvider = LlmProvider.GROQ): LlmResponse {
+    suspend fun routeFor(prompt: String, preferred: LlmProvider = LlmProvider.GROQ): Result<LlmResponse> {
         val result = tryProvider(preferred, prompt)
-        if (result != null) return result
+        if (result.isSuccess) return result
+
+        Log.w(TAG, "${preferred.name} failed: ${result.exceptionOrNull()?.message}, trying fallback...")
 
         if (preferred != LlmProvider.GEMINI) {
             val geminiResult = tryProvider(LlmProvider.GEMINI, prompt)
-            if (geminiResult != null) {
-                Log.i(TAG, "Falling back to GEMINI")
+            if (geminiResult.isSuccess) {
+                Log.i(TAG, "Falling back to GEMINI succeeded")
                 return geminiResult
             }
+            Log.w(TAG, "GEMINI failed: ${geminiResult.exceptionOrNull()?.message}")
         }
 
         val fallbacks = LlmProvider.entries.filter { it != preferred && it != LlmProvider.GEMINI }
         for (provider in fallbacks) {
-            val result = tryProvider(provider, prompt)
-            if (result != null) {
-                Log.i(TAG, "Using fallback: ${provider.name}")
-                return result
+            val fallbackResult = tryProvider(provider, prompt)
+            if (fallbackResult.isSuccess) {
+                Log.i(TAG, "Fallback ${provider.name} succeeded")
+                return fallbackResult
             }
+            Log.w(TAG, "Fallback ${provider.name} failed: ${fallbackResult.exceptionOrNull()?.message}")
         }
 
-        throw Exception("All LLM providers failed, unavailable, or have no API key configured. Please add your keys in Settings.")
+        val failedProviders = LlmProvider.entries.filter { apiKeyProvider.hasUserKey(it) }
+        Log.e(TAG, "All ${failedProviders.size} configured providers failed")
+        return Result.failure(AllProvidersFailedException())
     }
 }

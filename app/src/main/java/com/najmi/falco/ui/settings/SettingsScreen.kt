@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -104,26 +105,54 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(32.dp))
 
-        SettingsSectionHeader("API KEYS")
+        var apiKeysExpanded by remember { mutableStateOf(true) }
+        var pendingKeys by remember { mutableStateOf<Map<LlmProvider, String>>(emptyMap()) }
 
-        Spacer(Modifier.height(12.dp))
-
-        viewModel.providers.forEach { provider ->
-            ApiKeyInputRow(
-                provider = provider,
-                currentKey = viewModel.getCurrentKey(provider),
-                hasKey = viewModel.hasUserKey(provider),
-                onKeyChange = { key -> viewModel.setUserApiKey(provider, key) }
-            )
-            Spacer(Modifier.height(8.dp))
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        FalcoGhostButton(
-            text = "Clear All Keys",
-            onClick = { viewModel.clearAllKeys() }
+        SettingsSectionHeaderWithToggle(
+            label = "API KEYS",
+            isExpanded = apiKeysExpanded,
+            onToggle = { apiKeysExpanded = !apiKeysExpanded }
         )
+
+        if (apiKeysExpanded) {
+            Spacer(Modifier.height(12.dp))
+
+            viewModel.providers.forEach { provider ->
+                ApiKeyInputRow(
+                    provider = provider,
+                    currentKey = viewModel.getCurrentKey(provider),
+                    hasKey = viewModel.hasUserKey(provider),
+                    onKeyChange = { key ->
+                        pendingKeys = pendingKeys + (provider to key)
+                    }
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            if (pendingKeys.isNotEmpty()) {
+                FalcoAccentButton(
+                    text = "Save Changes",
+                    onClick = {
+                        val keysToSave = pendingKeys.toMap()
+                        keysToSave.forEach { (prov, key) ->
+                            viewModel.setUserApiKey(prov, key)
+                        }
+                        pendingKeys = emptyMap()
+                    }
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+
+            FalcoGhostButton(
+                text = "Clear All Keys",
+                onClick = {
+                    viewModel.clearAllKeys()
+                    pendingKeys = emptyMap()
+                }
+            )
+        }
 
         Spacer(Modifier.height(32.dp))
 
@@ -239,6 +268,32 @@ private fun SettingsSectionHeader(label: String) {
         style = FalcoTypography.labelSmall.copy(letterSpacing = FalcoDimens.LetterSpacingLabel),
         color = LocalFalcoPalette.current.textGhost
     )
+}
+
+@Composable
+private fun SettingsSectionHeaderWithToggle(
+    label: String,
+    isExpanded: Boolean,
+    onToggle: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            label,
+            style = FalcoTypography.labelSmall.copy(letterSpacing = FalcoDimens.LetterSpacingLabel),
+            color = LocalFalcoPalette.current.textGhost
+        )
+        Text(
+            if (isExpanded) "[-]" else "[+]",
+            style = FalcoTypography.labelSmall,
+            color = LocalFalcoPalette.current.textMuted
+        )
+    }
 }
 
 @Composable
@@ -376,6 +431,33 @@ private fun FalcoGhostButton(
             fontWeight = FontWeight.Medium,
             letterSpacing = 2.sp,
             color = palette.textPrimary
+        )
+    }
+}
+
+@Composable
+private fun FalcoAccentButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val palette = LocalFalcoPalette.current
+    
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .background(palette.textPrimary)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text.uppercase(),
+            fontSize = 12.sp,
+            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 2.sp,
+            color = palette.bg
         )
     }
 }

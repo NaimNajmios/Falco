@@ -16,10 +16,22 @@ class QueryExpansionAgent @Inject constructor(
     override val agentName = "QueryExpansion"
     override val preferredProvider = LlmProvider.GROQ
 
-    override suspend fun execute(claim: Claim): List<String> {
-        val prompt = buildPrompt(claim)
-        val response = router.routeFor(prompt, preferredProvider)
-        return parseResponse(response.text)
+    override suspend fun execute(claim: Claim): Result<List<String>> {
+        return try {
+            val prompt = buildPrompt(claim)
+            val routeResult = router.routeFor(prompt, preferredProvider)
+            
+            routeResult.fold(
+                onSuccess = { response ->
+                    Result.success(parseResponse(response.text))
+                },
+                onFailure = { error ->
+                    Result.failure(error)
+                }
+            )
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     private fun buildPrompt(claim: Claim) = """

@@ -6,6 +6,7 @@ import com.najmi.falco.data.remote.LlmProvider
 import com.najmi.falco.data.remote.LlmResponse
 import com.najmi.falco.di.ApiKeyProvider
 import com.najmi.falco.domain.model.TokenUsage
+import com.najmi.falco.provider.RateLimitException
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.post
@@ -24,7 +25,7 @@ import javax.inject.Singleton
 
 @Serializable
 data class CerebrasRequest(
-    val model: String = "llama3.3-70b",
+    val model: String = "llama-3.3-70b",
     val messages: List<CerebrasMessage>,
     val temperature: Float = 0.3f,
     @SerialName("max_tokens") val maxTokens: Int = 1024
@@ -79,6 +80,11 @@ class CerebrasClient @Inject constructor(
 
         val status = response.status
         val responseBody = response.bodyAsText()
+
+        if (status == HttpStatusCode.TooManyRequests) {
+            Log.e(TAG, "Cerebras rate limit exceeded")
+            throw RateLimitException("CEREBRAS")
+        }
 
         if (status != HttpStatusCode.OK) {
             Log.e(TAG, "Cerebras error ($status): $responseBody")

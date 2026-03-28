@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,8 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.najmi.falco.domain.model.VerificationState
 import com.najmi.falco.ui.dossier.DossierScreen
+import com.najmi.falco.ui.dossier.DossierViewModel
+import com.najmi.falco.ui.dossier.VerdictDetailScreen
 import com.najmi.falco.ui.hypothesis.HypothesisScreen
 import com.najmi.falco.ui.hypothesis.HypothesisViewModel
 import com.najmi.falco.ui.navigation.FalcoBottomNav
@@ -61,37 +61,14 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun FalcoApp() {
     val hypothesisViewModel: HypothesisViewModel = hiltViewModel()
-    val verificationState by hypothesisViewModel.verificationState.collectAsState()
+    val dossierViewModel: DossierViewModel = hiltViewModel()
+    val dossierState by dossierViewModel.uiState.collectAsState()
 
     var selectedTab by remember {
         mutableStateOf(FalcoTab.Hypothesis)
     }
 
-    LaunchedEffect(verificationState) {
-        when (verificationState) {
-            is VerificationState.InProgress -> {
-                selectedTab = FalcoTab.Pipeline
-            }
-            is VerificationState.Success -> {
-                if (selectedTab == FalcoTab.Pipeline) {
-                    selectedTab = FalcoTab.Dossier
-                }
-            }
-            is VerificationState.Error -> {
-                if (selectedTab == FalcoTab.Pipeline) {
-                    selectedTab = FalcoTab.Dossier
-                }
-            }
-            is VerificationState.Idle -> { }
-        }
-    }
-
-    val enabledTabs = remember(verificationState) {
-        when (verificationState) {
-            is VerificationState.InProgress -> setOf(FalcoTab.Hypothesis, FalcoTab.Pipeline, FalcoTab.Settings)
-            else -> setOf(FalcoTab.Hypothesis, FalcoTab.Dossier, FalcoTab.Settings)
-        }
-    }
+    val enabledTabs = setOf(FalcoTab.Hypothesis, FalcoTab.Pipeline, FalcoTab.Dossier, FalcoTab.Settings)
 
     Column(modifier = Modifier.fillMaxSize().background(LocalFalcoPalette.current.bg)) {
         FalcoHeader(modifier = Modifier.statusBarsPadding())
@@ -104,16 +81,28 @@ private fun FalcoApp() {
                     )
                 }
                 FalcoTab.Pipeline -> {
-                    PipelineScreen(hypothesisViewModel = hypothesisViewModel)
-                }
-                FalcoTab.Dossier -> {
-                    DossierScreen(
-                        viewModel = hypothesisViewModel,
+                    PipelineScreen(
+                        hypothesisViewModel = hypothesisViewModel,
                         onNewClaim = {
                             hypothesisViewModel.reset()
                             selectedTab = FalcoTab.Hypothesis
                         }
                     )
+                }
+                FalcoTab.Dossier -> {
+                    if (dossierState.selectedVerdict != null) {
+                        VerdictDetailScreen(
+                            verdict = dossierState.selectedVerdict!!,
+                            onBack = { dossierViewModel.clearSelection() }
+                        )
+                    } else {
+                        DossierScreen(
+                            viewModel = dossierViewModel,
+                            onVerdictSelected = { claimId ->
+                                dossierViewModel.selectVerdict(claimId)
+                            }
+                        )
+                    }
                 }
                 FalcoTab.Settings -> {
                     SettingsScreen()

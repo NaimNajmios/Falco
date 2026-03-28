@@ -25,10 +25,22 @@ class ClaimClassifierAgent @Inject constructor(
     override val agentName = "ClaimClassifier"
     override val preferredProvider = LlmProvider.GROQ
 
-    override suspend fun execute(claimText: String): Claim {
-        val prompt = buildPrompt(claimText)
-        val response = router.routeFor(prompt, preferredProvider)
-        return parseResponse(claimText, response.text)
+    override suspend fun execute(claimText: String): Result<Claim> {
+        return try {
+            val prompt = buildPrompt(claimText)
+            val routeResult = router.routeFor(prompt, preferredProvider)
+            
+            routeResult.fold(
+                onSuccess = { response ->
+                    Result.success(parseResponse(claimText, response.text))
+                },
+                onFailure = { error ->
+                    Result.failure(error)
+                }
+            )
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     private fun buildPrompt(claim: String) = """

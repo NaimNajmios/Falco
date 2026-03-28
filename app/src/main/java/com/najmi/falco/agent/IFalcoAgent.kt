@@ -5,5 +5,5 @@ import com.najmi.falco.data.remote.LlmProvider
 interface IFalcoAgent<I, O> {
     val agentName: String
     val preferredProvider: LlmProvider
-    suspend fun execute(input: I): O
+    suspend fun execute(input: I): Result<O>
 }

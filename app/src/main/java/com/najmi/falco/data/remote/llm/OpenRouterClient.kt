@@ -6,6 +6,7 @@ import com.najmi.falco.data.remote.LlmProvider
 import com.najmi.falco.data.remote.LlmResponse
 import com.najmi.falco.di.ApiKeyProvider
 import com.najmi.falco.domain.model.TokenUsage
+import com.najmi.falco.provider.RateLimitException
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.post
@@ -79,6 +80,11 @@ class OpenRouterClient @Inject constructor(
 
         val status = response.status
         val responseBody = response.bodyAsText()
+
+        if (status == HttpStatusCode.TooManyRequests) {
+            Log.e(TAG, "OpenRouter rate limit exceeded")
+            throw RateLimitException("OPENROUTER")
+        }
 
         if (status != HttpStatusCode.OK) {
             Log.e(TAG, "OpenRouter error ($status): $responseBody")
