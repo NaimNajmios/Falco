@@ -2,7 +2,9 @@ package com.najmi.falco.data.remote.llm
 
 import android.util.Log
 import com.najmi.falco.data.remote.LlmClient
+import com.najmi.falco.data.remote.LlmProvider
 import com.najmi.falco.data.remote.LlmResponse
+import com.najmi.falco.di.ApiKeyProvider
 import com.najmi.falco.domain.model.TokenUsage
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -16,7 +18,6 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
-import javax.inject.Named
 import javax.inject.Singleton
 
 @Serializable
@@ -60,11 +61,12 @@ data class OpenRouterError(val message: String, val type: String? = null, val co
 class OpenRouterClient @Inject constructor(
     private val httpClient: HttpClient,
     private val json: Json,
-    @Named("openrouter") private val apiKey: String
+    private val apiKeyProvider: ApiKeyProvider
 ) : LlmClient {
     companion object { private const val TAG = "OpenRouterClient" }
 
     override suspend fun chat(prompt: String): LlmResponse {
+        val apiKey = apiKeyProvider.getKey(LlmProvider.OPENROUTER)
         Log.d(TAG, "Sending request to OpenRouter, prompt length: ${prompt.length}")
 
         val response = httpClient.post("https://openrouter.ai/api/v1/chat/completions") {

@@ -7,8 +7,12 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
+import com.najmi.falco.data.remote.LlmProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -23,14 +27,44 @@ class UserPreferencesRepository @Inject constructor(
         val DARK_MODE = booleanPreferencesKey("dark_mode")
         val DEBUG_MODE = booleanPreferencesKey("debug_mode")
         val PREFERRED_PROVIDER = stringPreferencesKey("preferred_provider")
+        val USE_USER_KEYS = booleanPreferencesKey("use_user_keys")
     }
+
+    private val masterKey = MasterKey.Builder(context)
+        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+        .build()
+
+    private val encryptedPrefs = EncryptedSharedPreferences.create(
+        context,
+        "falco_encrypted_prefs",
+        masterKey,
+        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+    )
 
     val preferences: Flow<UserPreferences> = context.dataStore.data.map { prefs ->
         UserPreferences(
             isDarkMode = prefs[Keys.DARK_MODE] ?: true,
             isDebugMode = prefs[Keys.DEBUG_MODE] ?: false,
-            preferredProvider = prefs[Keys.PREFERRED_PROVIDER] ?: "GROQ"
+            preferredProvider = prefs[Keys.PREFERRED_PROVIDER] ?: "GROQ",
+            useUserKeys = prefs[Keys.USE_USER_KEYS] ?: false,
+            userGeminiKey = getEncryptedKey("user_gemini_key"),
+            userGroqKey = getEncryptedKey("user_groq_key"),
+            userCerebrasKey = getEncryptedKey("user_cerebras_key"),
+            userOpenRouterKey = getEncryptedKey("user_openrouter_key")
         )
+    }
+
+    private fun getEncryptedKey(keyName: String): String? {
+        return encryptedPrefs.getString(keyName, null)
+    }
+
+    private fun setEncryptedKey(keyName: String, value: String?) {
+        if (value.isNullOrBlank()) {
+            encryptedPrefs.edit().remove(keyName).apply()
+        } else {
+            encryptedPrefs.edit().putString(keyName, value).apply()
+        }
     }
 
     suspend fun setDarkMode(enabled: Boolean) {
@@ -43,5 +77,36 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun setPreferredProvider(provider: String) {
         context.dataStore.edit { it[Keys.PREFERRED_PROVIDER] = provider }
+    }
+
+    suspend fun setUseUserKeys(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.USE_USER_KEYS] = enabled }
+    }
+
+    suspend fun setUserApiKey(provider: LlmProvider, key: String?) {
+        val keyName = when (provider) {
+            LlmProvider.GEMINI -> "user_gemini_key"
+            LlmProvider.GROQ -> "user_groq_key"
+            LlmProvider.CEREBRAS -> "user_cerebras_key"
+            LlmProvider.OPENROUTER -> "user_openrouter_key"
+        }
+        setEncryptedKey(keyName, key)
+    }
+
+    fun getApiKey(provider: LlmProvider): String? {
+        return when (provider) {
+            LlmProvider.GEMINI -> getEncryptedKey("user_gemini_key")
+            LlmProvider.GROQ -> getEncryptedKey("user_groq_key")
+            LlmProvider.CEREBRAS -> getEncryptedKey("user_cerebras_key")
+            LlmProvider.OPENROUTER -> getEncryptedKey("user_openrouter_key")
+        }
+    }
+
+    suspend fun clearAllUserKeys() {
+        setEncryptedKey("user_gemini_key", null)
+        setEncryptedKey("user_groq_key", null)
+        setEncryptedKey("user_cerebras_key", null)
+        setEncryptedKey("user_openrouter_key", null)
+        setUseUserKeys(false)
     }
 }

@@ -2,7 +2,9 @@ package com.najmi.falco.data.remote.llm
 
 import android.util.Log
 import com.najmi.falco.data.remote.LlmClient
+import com.najmi.falco.data.remote.LlmProvider
 import com.najmi.falco.data.remote.LlmResponse
+import com.najmi.falco.di.ApiKeyProvider
 import com.najmi.falco.domain.model.TokenUsage
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -16,7 +18,6 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
-import javax.inject.Named
 import javax.inject.Singleton
 
 @Serializable
@@ -67,11 +68,12 @@ data class GeminiError(val code: String, val message: String, val status: String
 class GeminiClient @Inject constructor(
     private val httpClient: HttpClient,
     private val json: Json,
-    @Named("gemini") private val apiKey: String
+    private val apiKeyProvider: ApiKeyProvider
 ) : LlmClient {
     companion object { private const val TAG = "GeminiClient" }
 
     override suspend fun chat(prompt: String): LlmResponse {
+        val apiKey = apiKeyProvider.getKey(LlmProvider.GEMINI)
         Log.d(TAG, "Sending request to Gemini, prompt length: ${prompt.length}")
 
         val response = httpClient.post(
