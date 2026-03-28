@@ -22,11 +22,23 @@ class ProviderRouter @Inject constructor(
         private const val RETRY_DELAY_MS = 2000L
     }
 
+    private val rateLimitedProviders = mutableMapOf<LlmProvider, Long>()
+    private val rateLimitCooldownMs = 60_000L
+
+    private fun isRateLimited(provider: LlmProvider): Boolean {
+        val lastRateLimited = rateLimitedProviders[provider] ?: return false
+        return System.currentTimeMillis() - lastRateLimited < rateLimitCooldownMs
+    }
+
     private suspend fun tryProvider(provider: LlmProvider, prompt: String): Result<LlmResponse> {
         val client = clients[provider] ?: return Result.failure(NoSuchElementException("No client for ${provider.name}"))
         
         if (!healthTracker.isAvailable(provider)) {
             return Result.failure(IllegalStateException("${provider.name} is marked unhealthy"))
+        }
+
+        if (isRateLimited(provider)) {
+            return Result.failure(IllegalStateException("${provider.name} is rate limited, skipping temporarily"))
         }
         
         if (!apiKeyProvider.hasUserKey(provider)) {
@@ -37,7 +49,6 @@ class ProviderRouter @Inject constructor(
         if (!client.canMakeRequest()) {
             val remaining = tokenSteward.getRemainingTokens(provider)
             Log.w(TAG, "${provider.name} quota exceeded, remaining tokens: $remaining")
-            healthTracker.reportError(provider.name)
             return Result.failure(RateLimitException(provider.name, "Quota exceeded for ${provider.name}"))
         }
 
@@ -47,13 +58,23 @@ class ProviderRouter @Inject constructor(
             Result.success(response)
         } catch (e: Exception) {
             Log.e(TAG, "Provider ${provider.name} failed: ${e.message}")
-            val isModelError = e.message?.contains("model", ignoreCase = true) == true && 
-                e.message?.contains("not found", ignoreCase = true) == true
+            val isHttp429 = e.message?.contains("429", ignoreCase = true) == true ||
+                e.message?.contains("rate limit", ignoreCase = true) == true
+            val isHttp400 = e.message?.contains("400", ignoreCase = true) == true ||
+                e.message?.contains("Bad Request", ignoreCase = true) == true
+            val isModelError = (e.message?.contains("model", ignoreCase = true) == true && 
+                e.message?.contains("not found", ignoreCase = true) == true) ||
+                e.message?.contains("does not exist", ignoreCase = true) == true ||
+                e.message?.contains("Invalid model", ignoreCase = true) == true
             val isPaymentError = e.message?.contains("credits", ignoreCase = true) == true ||
                 e.message?.contains("402", ignoreCase = true) == true
             
-            if (isModelError || isPaymentError || e is RateLimitException) {
+            if (isHttp429) {
+                rateLimitedProviders[provider] = System.currentTimeMillis()
+                Log.w(TAG, "${provider.name} got 429, marking as temporarily unavailable for ${rateLimitCooldownMs/1000}s")
+            } else if (isModelError || isPaymentError || isHttp400) {
                 healthTracker.reportError(provider.name)
+                Log.w(TAG, "${provider.name} got permanent error (model/payment/400), marking unhealthy")
             }
             Result.failure(e)
         }
@@ -95,7 +116,9 @@ class ProviderRouter @Inject constructor(
             Log.w(TAG, "GEMINI failed: ${geminiResult.exceptionOrNull()?.message}")
         }
 
-        val fallbacks = LlmProvider.entries.filter { it != preferred && it != LlmProvider.GEMINI }
+        val fallbacks = LlmProvider.entries.filter { 
+            it != preferred && it != LlmProvider.GEMINI && !isRateLimited(it) 
+        }
         for (provider in fallbacks) {
             val fallbackResult = tryProviderWithRetry(provider, prompt)
             if (fallbackResult.isSuccess) {

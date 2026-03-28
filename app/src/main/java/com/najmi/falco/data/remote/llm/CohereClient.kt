@@ -26,17 +26,23 @@ import javax.inject.Singleton
 @Serializable
 data class CohereRequest(
     val model: String = "command-r",
-    val messages: List<CohereMessage>,
+    val message: String,
+    val chatHistory: List<CohereChatMessage>? = null,
     val temperature: Float = 0.3f,
     @SerialName("max_tokens") val maxTokens: Int = 1024
 )
 
 @Serializable
-data class CohereMessage(val role: String, val content: String)
+data class CohereChatMessage(
+    val role: String,
+    val text: String
+)
 
 @Serializable
 data class CohereResponse(
-    val choices: List<CohereChoice>,
+    val text: String? = null,
+    val generationId: String? = null,
+    val chatHistory: List<CohereChatMessage>? = null,
     val usage: CohereUsage? = null,
     val model: String? = null
 )
@@ -49,13 +55,11 @@ data class CohereUsage(
 )
 
 @Serializable
-data class CohereChoice(val message: CohereMessageResponse)
-
-@Serializable
-data class CohereMessageResponse(val content: String)
-
-@Serializable
-data class CohereErrorResponse(val message: String, val type: String? = null)
+data class CohereErrorResponse(
+    val message: String,
+    val type: String? = null,
+    val code: String? = null
+)
 
 @Singleton
 class CohereClient @Inject constructor(
@@ -80,12 +84,10 @@ class CohereClient @Inject constructor(
         val apiKey = apiKeyProvider.getKey(LlmProvider.COHERE)
         DebugLogger.d("[COHERE] Request: prompt=${prompt.length} chars")
 
-        val response = httpClient.post("https://openrouter.ai/api/v1/chat/completions") {
+        val response = httpClient.post("https://api.cohere.ai/v1/chat") {
             headers.append("Authorization", "Bearer $apiKey")
-            headers.append("HTTP-Referer", "https://github.com/naimnajmios/falco")
-            headers.append("X-Title", "Falco")
-            contentType(ContentType.Application.Json)
-            setBody(CohereRequest(messages = listOf(CohereMessage(role = "user", content = prompt))))
+            headers.append("Content-Type", "application/json")
+            setBody(CohereRequest(message = prompt))
         }
 
         val latency = System.currentTimeMillis() - startTime
@@ -98,7 +100,7 @@ class CohereClient @Inject constructor(
         }
 
         if (status != HttpStatusCode.OK) {
-            DebugLogger.e("[COHERE] Error ($status): ${responseBody.take(100)}")
+            DebugLogger.e("[COHERE] Error ($status): ${responseBody.take(200)}")
             val errorMessage = try {
                 json.decodeFromString<CohereErrorResponse>(responseBody).message
             } catch (e: Exception) {
@@ -111,10 +113,11 @@ class CohereClient @Inject constructor(
             json.decodeFromString<CohereResponse>(responseBody)
         } catch (e: Exception) {
             DebugLogger.e("[COHERE] Parse error: ${e.message}")
+            DebugLogger.e("[COHERE] Response body: $responseBody")
             throw Exception("Invalid response from Cohere: ${e.message}")
         }
 
-        val text = cohereResponse.choices.firstOrNull()?.message?.content
+        val text = cohereResponse.text
             ?: throw Exception("Empty response from Cohere")
 
         val usage = TokenUsage(

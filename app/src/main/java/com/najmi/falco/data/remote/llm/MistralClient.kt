@@ -25,7 +25,7 @@ import javax.inject.Singleton
 
 @Serializable
 data class MistralRequest(
-    val model: String = "mistralai/mistral-7b-instruct",
+    val model: String = "open-mistral-7b",
     val messages: List<MistralMessage>,
     val temperature: Float = 0.3f,
     @SerialName("max_tokens") val maxTokens: Int = 1024
@@ -78,13 +78,12 @@ class MistralClient @Inject constructor(
 
         val startTime = System.currentTimeMillis()
         val apiKey = apiKeyProvider.getKey(LlmProvider.MISTRAL)
+        DebugLogger.d("[MISTRAL] API Key present: ${!apiKey.isNullOrBlank()}, length: ${apiKey?.length ?: 0}")
         DebugLogger.d("[MISTRAL] Request: prompt=${prompt.length} chars")
 
-        val response = httpClient.post("https://openrouter.ai/api/v1/chat/completions") {
+        val response = httpClient.post("https://api.mistral.ai/v1/chat/completions") {
             headers.append("Authorization", "Bearer $apiKey")
-            headers.append("HTTP-Referer", "https://github.com/naimnajmios/falco")
-            headers.append("X-Title", "Falco")
-            contentType(ContentType.Application.Json)
+            headers.append("Content-Type", "application/json")
             setBody(MistralRequest(messages = listOf(MistralMessage(role = "user", content = prompt))))
         }
 
