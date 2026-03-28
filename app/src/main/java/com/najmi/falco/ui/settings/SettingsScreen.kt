@@ -170,7 +170,7 @@ fun SettingsScreen(
                 Spacer(Modifier.height(8.dp))
                 SettingsInfoRow("VERSION", "1.0.0_STABLE")
                 Spacer(Modifier.height(4.dp))
-                SettingsInfoRow("ENV", "PRODUCTION")
+                SettingsInfoRow("ENV", if (prefs.isDebugMode) "DEBUG" else "PRODUCTION")
                 Spacer(Modifier.height(4.dp))
                 SettingsInfoRow("BUILD", "20260328")
                 Spacer(Modifier.height(4.dp))

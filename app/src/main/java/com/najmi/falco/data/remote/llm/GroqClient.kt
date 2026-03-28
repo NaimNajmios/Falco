@@ -1,6 +1,6 @@
 package com.najmi.falco.data.remote.llm
 
-import android.util.Log
+import com.najmi.falco.data.local.DebugLogger
 import com.najmi.falco.data.remote.LlmClient
 import com.najmi.falco.data.remote.LlmProvider
 import com.najmi.falco.data.remote.LlmResponse
@@ -63,11 +63,11 @@ class GroqClient @Inject constructor(
     private val json: Json,
     private val apiKeyProvider: ApiKeyProvider
 ) : LlmClient {
-    companion object { private const val TAG = "GroqClient" }
 
     override suspend fun chat(prompt: String): LlmResponse {
+        val startTime = System.currentTimeMillis()
         val apiKey = apiKeyProvider.getKey(LlmProvider.GROQ)
-        Log.d(TAG, "Sending request to Groq, prompt length: ${prompt.length}")
+        DebugLogger.d("[GROQ] Request: prompt=${prompt.length} chars")
 
         val response = httpClient.post("https://api.groq.com/openai/v1/chat/completions") {
             headers.append("Authorization", "Bearer $apiKey")
@@ -75,11 +75,12 @@ class GroqClient @Inject constructor(
             setBody(GroqRequest(messages = listOf(GroqMessage(role = "user", content = prompt))))
         }
 
+        val latency = System.currentTimeMillis() - startTime
         val status = response.status
         val responseBody = response.bodyAsText()
 
         if (status != HttpStatusCode.OK) {
-            Log.e(TAG, "Groq error ($status): $responseBody")
+            DebugLogger.e("[GROQ] Error ($status): ${responseBody.take(100)}")
             val errorMessage = try {
                 json.decodeFromString<GroqErrorResponse>(responseBody).error.message
             } catch (e: Exception) {
@@ -91,7 +92,7 @@ class GroqClient @Inject constructor(
         val groqResponse: GroqResponse = try {
             json.decodeFromString<GroqResponse>(responseBody)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to parse Groq response: ${e.message}")
+            DebugLogger.e("[GROQ] Parse error: ${e.message}")
             throw Exception("Invalid response from Groq: ${e.message}")
         }
 
@@ -106,7 +107,7 @@ class GroqClient @Inject constructor(
             model = groqResponse.model
         )
 
-        Log.d(TAG, "Received response, tokens: ${usage.totalTokens}")
+        DebugLogger.llm("GROQ", groqResponse.model ?: "llama-3.3-70b-versatile", usage.totalTokens, latency)
         return LlmResponse(text, usage)
     }
 }

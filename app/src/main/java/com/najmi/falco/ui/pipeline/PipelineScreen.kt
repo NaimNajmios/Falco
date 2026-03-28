@@ -8,6 +8,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,9 +26,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.najmi.falco.data.local.DebugLogger
 import com.najmi.falco.domain.model.VerificationState
 import com.najmi.falco.domain.model.VerificationStage
 import com.najmi.falco.ui.hypothesis.HypothesisViewModel
@@ -207,6 +212,9 @@ private fun RealTimeExtractionPanel(state: VerificationState) {
 
 @Composable
 private fun LiveMonitor() {
+    var showDebug by remember { mutableStateOf(false) }
+    val isDebugEnabled = DebugLogger.isEnabled()
+
     val infiniteTransition = rememberInfiniteTransition(label = "monitor")
     val bars = (0..11).map { index ->
         infiniteTransition.animateFloat(
@@ -227,9 +235,21 @@ private fun LiveMonitor() {
             .padding(16.dp)
     ) {
         Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (isDebugEnabled) Modifier.clickable { showDebug = !showDebug }
+                        else Modifier
+                    ),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text("LIVE MONITOR: NEURAL_LAYER_08", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
                 Spacer(Modifier.weight(1f))
+                if (isDebugEnabled) {
+                    Text("[DEBUG]", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textMuted)
+                    Spacer(Modifier.width(8.dp))
+                }
                 Text("■", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textPrimary)
             }
             Spacer(Modifier.height(12.dp))
@@ -260,6 +280,24 @@ private fun LiveMonitor() {
                 Text("SIG.STRENGTH: 0.992  ", style = FalcoTypography.labelMedium, color = LocalFalcoPalette.current.textGhost)
                 Text("LATENCY: 0.04MS  ", style = FalcoTypography.labelMedium, color = LocalFalcoPalette.current.textGhost)
                 Text("14.2GB", style = FalcoTypography.labelMedium, color = LocalFalcoPalette.current.textGhost)
+            }
+
+            if (showDebug && isDebugEnabled) {
+                Spacer(Modifier.height(12.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(LocalFalcoPalette.current.bg)
+                        .padding(8.dp)
+                ) {
+                    Column {
+                        Text("DEBUG PANEL", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textPrimary)
+                        Spacer(Modifier.height(4.dp))
+                        Text("Toggle debug mode in Settings to enable logging", style = FalcoTypography.labelMedium, color = LocalFalcoPalette.current.textMuted)
+                        Spacer(Modifier.height(4.dp))
+                        Text("Pipeline stages logged to logcat (tag: FALCO)", style = FalcoTypography.labelMedium, color = LocalFalcoPalette.current.textMuted)
+                    }
+                }
             }
         }
     }

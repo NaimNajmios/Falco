@@ -73,6 +73,7 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun setDebugMode(enabled: Boolean) {
         context.dataStore.edit { it[Keys.DEBUG_MODE] = enabled }
+        DebugLogger.setEnabled(enabled)
     }
 
     suspend fun setPreferredProvider(provider: String) {

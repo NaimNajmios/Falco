@@ -2,6 +2,7 @@ package com.najmi.falco.di
 
 import android.util.Log
 import com.najmi.falco.BuildConfig
+import com.najmi.falco.data.local.DebugLogger
 import com.najmi.falco.data.remote.openapi.OpenAlexClient
 import com.najmi.falco.data.remote.semanticscholar.SemanticScholarClient
 import dagger.Module
@@ -52,13 +53,21 @@ object NetworkModule {
     @Singleton
     fun provideHttpClient(json: Json): HttpClient = HttpClient(Android) {
         install(ContentNegotiation) { json(json) }
-        install(Logging) {
-            logger = object : Logger {
-                override fun log(message: String) {
-                    Log.d("KtorClient", message.take(500))
+        if (DebugLogger.isEnabled()) {
+            install(Logging) {
+                logger = object : Logger {
+                    override fun log(message: String) {
+                        val summary = message
+                            .lines()
+                            .filter { it.isNotBlank() }
+                            .take(3)
+                            .joinToString(" | ")
+                            .take(300)
+                        DebugLogger.d("[NET] $summary")
+                    }
                 }
+                level = LogLevel.HEADERS
             }
-            level = LogLevel.BODY
         }
         engine {
             connectTimeout = 30_000
