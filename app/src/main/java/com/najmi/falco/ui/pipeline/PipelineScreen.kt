@@ -161,6 +161,9 @@ private fun VerdictResult(
     }
 
     Spacer(Modifier.height(32.dp))
+    RealTimeExtractionPanel(state = state)
+
+    Spacer(Modifier.height(32.dp))
 
     FalcoGhostButton("NEW CLAIM", onClick = onNewClaim)
     Spacer(Modifier.height(80.dp))
@@ -331,7 +334,7 @@ private fun RealTimeExtractionPanel(state: VerificationState) {
             Spacer(Modifier.height(12.dp))
 
             if (state is VerificationState.Success) {
-                state.verdict.stances.take(3).forEach { stance ->
+                state.verdict.stances.take(5).forEach { stance ->
                     Text(
                         "REF: ${stance.paper.title.take(50)}",
                         style = FalcoTypography.bodySmall,
