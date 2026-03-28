@@ -16,7 +16,7 @@ class TemporalFreshnessAnalyzerTest {
     
     @Test
     fun `analyze - returns same papers`() {
-        val papers = listOf(createPaperQuality(year = 2024))
+        val papers = listOf(createPaperQuality(year = 2026))
         
         val result = analyzer.analyze(papers, ClaimType.EMPIRICAL)
         
@@ -28,7 +28,7 @@ class TemporalFreshnessAnalyzerTest {
         val papers = listOf(
             createPaperQuality(year = 2010, freshnessFlag = FreshnessFlag.STALE),
             createPaperQuality(year = 2011, freshnessFlag = FreshnessFlag.STALE),
-            createPaperQuality(year = 2024, freshnessFlag = FreshnessFlag.CURRENT)
+            createPaperQuality(year = 2026, freshnessFlag = FreshnessFlag.FRESH)
         )
         
         val warning = analyzer.generateTemporalWarning(papers)
@@ -40,8 +40,8 @@ class TemporalFreshnessAnalyzerTest {
     @Test
     fun `generateTemporalWarning - minority stale returns null`() {
         val papers = listOf(
-            createPaperQuality(year = 2024, freshnessFlag = FreshnessFlag.CURRENT),
-            createPaperQuality(year = 2024, freshnessFlag = FreshnessFlag.CURRENT),
+            createPaperQuality(year = 2026, freshnessFlag = FreshnessFlag.FRESH),
+            createPaperQuality(year = 2026, freshnessFlag = FreshnessFlag.FRESH),
             createPaperQuality(year = 2018, freshnessFlag = FreshnessFlag.STALE)
         )
         
@@ -82,7 +82,7 @@ class TemporalFreshnessAnalyzerTest {
         title: String = "Test Paper",
         abstract: String = "Test abstract",
         authors: List<String> = listOf("Author 1"),
-        year: Int? = 2024,
+        year: Int? = 2026,
         citationCount: Int = 50,
         isOpenAccess: Boolean = true,
         doi: String? = "10.1234/test",
@@ -92,8 +92,8 @@ class TemporalFreshnessAnalyzerTest {
     ) = Paper(id, title, abstract, authors, year, citationCount, isOpenAccess, doi, url, source, fieldsOfStudy)
     
     private fun createPaperQuality(
-        year: Int = 2024,
-        freshnessFlag: FreshnessFlag = FreshnessFlag.CURRENT,
+        year: Int = 2026,
+        freshnessFlag: FreshnessFlag = FreshnessFlag.FRESH,
         fieldsOfStudy: List<String> = listOf("Computer Science")
     ) = PaperQuality(
         paper = createPaper(year = year, fieldsOfStudy = fieldsOfStudy),

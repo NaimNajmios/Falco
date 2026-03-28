@@ -80,17 +80,17 @@ class PaperQualityGateTest {
     }
     
     @Test
-    fun `freshness - recent paper returns CURRENT`() {
-        val paper = createPaper(year = 2024)
+    fun `freshness - recent paper returns FRESH`() {
+        val paper = createPaper(year = 2026)
         val result = gate.filter(listOf(paper), ClaimType.EMPIRICAL)
         
         assertTrue(result.isNotEmpty())
-        assertEquals(FreshnessFlag.CURRENT, result.first().freshnessFlag)
+        assertEquals(FreshnessFlag.FRESH, result.first().freshnessFlag)
     }
     
     @Test
     fun `freshness - old CS paper returns STALE`() {
-        val paper = createPaper(year = 2015, fieldsOfStudy = listOf("Computer Science"))
+        val paper = createPaper(year = 2025, fieldsOfStudy = listOf("Computer Science"))
         val result = gate.filter(listOf(paper), ClaimType.EMPIRICAL)
         
         assertTrue(result.isNotEmpty())
