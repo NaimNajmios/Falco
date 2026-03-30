@@ -4,8 +4,8 @@ import com.najmi.falco.agent.AggregatorAgent
 import com.najmi.falco.agent.AggregatorInput
 import com.najmi.falco.agent.ClaimClassifierAgent
 import com.najmi.falco.agent.QueryExpansionAgent
-import com.najmi.falco.agent.StanceActorAgent
-import com.najmi.falco.agent.StanceActorInput
+import com.najmi.falco.agent.SmartStanceActor
+import com.najmi.falco.agent.SmartStanceActorInput
 import com.najmi.falco.agent.StanceCriticAgent
 import com.najmi.falco.agent.StanceCriticInput
 import com.najmi.falco.data.local.DebugLogger
@@ -33,7 +33,7 @@ class FalcoOrchestrator @Inject constructor(
     private val paperRepo: IPaperRepository,
     private val paperQualityGate: PaperQualityGate,
     private val temporalAnalyzer: TemporalFreshnessAnalyzer,
-    private val stanceActor: StanceActorAgent,
+    private val stanceActor: SmartStanceActor,
     private val stanceCritic: StanceCriticAgent,
     private val algorithmicGrounding: AlgorithmicGrounding,
     private val aggregator: AggregatorAgent,
@@ -108,7 +108,7 @@ class FalcoOrchestrator @Inject constructor(
             send(VerificationState.InProgress(VerificationStage.ACTOR_CLASSIFICATION, "Classifying stances across ${analyzedPapers.size} papers..."))
             
             val actorResults = analyzedPapers.map { qualityPaper ->
-                async { stanceActor.execute(StanceActorInput(claim.text, qualityPaper.paper)) }
+                async { stanceActor.execute(SmartStanceActorInput(claim.text, qualityPaper.paper)) }
             }.awaitAll()
             
             val actorFailures = actorResults.count { it.isFailure }

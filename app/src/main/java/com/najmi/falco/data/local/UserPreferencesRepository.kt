@@ -5,6 +5,8 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -19,6 +21,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "falco_preferences")
+
+private val SMART_CHUNKING_KEY = booleanPreferencesKey("enable_smart_chunking")
+private val MAX_PAPERS_KEY = intPreferencesKey("max_papers_to_analyze")
+private val EARLY_STOP_CONFIDENCE_KEY = floatPreferencesKey("early_stop_confidence")
 
 @Singleton
 class UserPreferencesRepository @Inject constructor(
@@ -53,7 +59,10 @@ class UserPreferencesRepository @Inject constructor(
             userMistralKey = getEncryptedKey("user_mistral_key"),
             userCohereKey = getEncryptedKey("user_cohere_key"),
             userCerebrasKey = getEncryptedKey("user_cerebras_key"),
-            userOpenRouterKey = getEncryptedKey("user_openrouter_key")
+            userOpenRouterKey = getEncryptedKey("user_openrouter_key"),
+            enableSmartChunking = prefs[SMART_CHUNKING_KEY] ?: false,
+            maxPapersToAnalyze = prefs[MAX_PAPERS_KEY] ?: 10,
+            earlyStopConfidence = prefs[EARLY_STOP_CONFIDENCE_KEY] ?: 0.85f
         )
     }
 
@@ -114,5 +123,17 @@ class UserPreferencesRepository @Inject constructor(
         setEncryptedKey("user_cerebras_key", null)
         setEncryptedKey("user_openrouter_key", null)
         context.dataStore.edit { it[Keys.KEYS_REVISION] = System.currentTimeMillis() }
+    }
+
+    suspend fun setSmartChunkingEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[SMART_CHUNKING_KEY] = enabled }
+    }
+
+    suspend fun setMaxPapersToAnalyze(maxPapers: Int) {
+        context.dataStore.edit { it[MAX_PAPERS_KEY] = maxPapers.coerceIn(3, 20) }
+    }
+
+    suspend fun setEarlyStopConfidence(confidence: Float) {
+        context.dataStore.edit { it[EARLY_STOP_CONFIDENCE_KEY] = confidence.coerceIn(0.5f, 1.0f) }
     }
 }

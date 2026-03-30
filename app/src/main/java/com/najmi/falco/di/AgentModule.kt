@@ -3,8 +3,14 @@ package com.najmi.falco.di
 import com.najmi.falco.agent.AggregatorAgent
 import com.najmi.falco.agent.ClaimClassifierAgent
 import com.najmi.falco.agent.QueryExpansionAgent
+import com.najmi.falco.agent.SmartStanceActor
 import com.najmi.falco.agent.StanceActorAgent
 import com.najmi.falco.agent.StanceCriticAgent
+import com.najmi.falco.chunking.BatchAssembler
+import com.najmi.falco.chunking.ContentChunker
+import com.najmi.falco.chunking.EarlyStopEvaluator
+import com.najmi.falco.chunking.FreeTierQuotaManager
+import com.najmi.falco.chunking.TieredProviderRouter
 import com.najmi.falco.data.repository.OutletCredibilityRepository
 import com.najmi.falco.pipeline.AlgorithmicGrounding
 import com.najmi.falco.pipeline.FalcoOrchestrator
@@ -73,4 +79,20 @@ object AgentModule {
     @Provides
     @Singleton
     fun provideOutletCredibilityRepository(): OutletCredibilityRepository = OutletCredibilityRepository()
+
+    @Provides
+    @Singleton
+    fun provideSmartStanceActor(
+        chunker: ContentChunker,
+        assembler: BatchAssembler,
+        providerRouter: TieredProviderRouter,
+        earlyStopEvaluator: EarlyStopEvaluator,
+        quotaManager: FreeTierQuotaManager
+    ): SmartStanceActor = SmartStanceActor(
+        chunker = chunker,
+        assembler = assembler,
+        providerRouter = providerRouter,
+        earlyStopEvaluator = earlyStopEvaluator,
+        quotaManager = quotaManager
+    )
 }
