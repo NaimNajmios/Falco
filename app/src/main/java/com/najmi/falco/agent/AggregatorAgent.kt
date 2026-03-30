@@ -25,7 +25,14 @@ data class AggregatorInput(
     val temporalWarning: String? = null,
     val supportingCount: Int = stances.count { it.finalStance == Stance.SUPPORTS },
     val opposingCount: Int = stances.count { it.finalStance == Stance.OPPOSES },
-    val neutralCount: Int = stances.count { it.finalStance == Stance.NEUTRAL }
+    val neutralCount: Int = stances.count { it.finalStance == Stance.NEUTRAL },
+    val confidenceThreshold: Float = 0.5f
+)
+
+data class AggregatorOutput(
+    val verdict: Verdict,
+    val needsMorePapers: Boolean,
+    val suggestedQueries: List<String>?
 )
 
 @Serializable
@@ -37,19 +44,21 @@ data class AggregatorResponse(
     val opposingCount: Int,
     val neutralCount: Int,
     val dominantField: String,
-    val caveat: String? = null
+    val caveat: String? = null,
+    val needsMorePapers: Boolean = false,
+    val suggestedQueries: List<String>? = null
 )
 
 @Singleton
 class AggregatorAgent @Inject constructor(
     private val router: ProviderRouter,
     private val json: Json
-) : IFalcoAgent<AggregatorInput, Verdict> {
+) : IFalcoAgent<AggregatorInput, AggregatorOutput> {
 
     override val agentName = "Aggregator"
     override val defaultProvider = LlmProvider.GEMINI
 
-    override suspend fun execute(input: AggregatorInput, preferredProvider: LlmProvider?): Result<Verdict> {
+    override suspend fun execute(input: AggregatorInput, preferredProvider: LlmProvider?): Result<AggregatorOutput> {
         val provider = preferredProvider ?: defaultProvider
         return try {
             val prompt = buildPrompt(input)
@@ -72,14 +81,25 @@ class AggregatorAgent @Inject constructor(
         val papersJson = input.stances.joinToString(",\n") { stance ->
             val finalStance = stance.finalStance ?: stance.actorStance
             val groundingScore = stance.groundingScore ?: stance.confidence
-            """{"title": "${escapeJson(stance.paper.title)}","year": ${stance.paper.year ?: "null"},"citationCount": ${stance.paper.citationCount},"stance": "${finalStance.name}","reasoning": "${escapeJson(stance.actorReasoning)}","groundingScore": ${groundingScore}}"""
+            val consensusFlag = if (stance.isConsensus) " (consensus)" else if (stance.isOutlier) " (outlier)" else ""
+            """{"title": "${escapeJson(stance.paper.title)}","year": ${stance.paper.year ?: "null"},"citationCount": ${stance.paper.citationCount},"stance": "${finalStance.name}","reasoning": "${escapeJson(stance.actorReasoning)}","groundingScore": ${groundingScore}$consensusFlag}"""
         }
+
+        val adaptivePrompt = if (input.confidenceThreshold > 0 && input.stances.size < 15) {
+            """
+            
+            ADAPTIVE RETRIEVAL:
+            If confidence is below ${input.confidenceThreshold} OR evidence is highly mixed (no clear consensus),
+            set "needsMorePapers": true and provide "suggestedQueries" (1-2 new search terms to find additional evidence).
+            Otherwise, set "needsMorePapers": false and "suggestedQueries": null.
+            """
+        } else ""
 
         return """
             You are a research synthesis AI. You receive a list of academic paper stance evaluations
             for a hypothesis. Produce a calibrated verdict with a clear confidence level.
             Be conservative: if evidence is mixed, reflect that in the confidence score.
-            Return ONLY a JSON object.
+            RETURN ONLY A JSON OBJECT.
 
             CLAIM: "${input.claimText}"
             CLAIM TYPE: ${input.claimType.name}
@@ -91,6 +111,7 @@ class AggregatorAgent @Inject constructor(
             - Opposing: ${input.opposingCount}
             - Neutral: ${input.neutralCount}
             ${input.temporalWarning?.let { "\n- TEMPORAL WARNING: $it" } ?: ""}
+            $adaptivePrompt
 
             PAPER STANCES:
             [$papersJson]
@@ -104,12 +125,14 @@ class AggregatorAgent @Inject constructor(
               "opposingCount": <integer>,
               "neutralCount": <integer>,
               "dominantField": "<primary field of study from the papers>",
-              "caveat": "<optional caveat or null>"
+              "caveat": "<optional caveat or null>",
+              "needsMorePapers": <boolean>,
+              "suggestedQueries": <array of strings or null>
             }
         """.trimIndent()
     }
 
-    private fun parseResponse(raw: String, input: AggregatorInput): Verdict {
+    private fun parseResponse(raw: String, input: AggregatorInput): AggregatorOutput {
         val cleaned = raw.trim()
             .removePrefix("```json").removePrefix("```")
             .removeSuffix("```").trim()
@@ -126,8 +149,15 @@ class AggregatorAgent @Inject constructor(
             val field = parsed["dominantField"]?.jsonPrimitive?.content
                 ?: input.stances.firstOrNull()?.paper?.fieldsOfStudy?.firstOrNull()
                 ?: "Unknown"
+            
+            val needsMorePapers = parsed["needsMorePapers"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() ?: false
+            val suggestedQueries = parsed["suggestedQueries"]?.let { element ->
+                if (element is kotlinx.serialization.json.JsonArray) {
+                    element.mapNotNull { it.jsonPrimitive.content }.takeIf { it.isNotEmpty() }
+                } else null
+            }
 
-            Verdict(
+            val verdict = Verdict(
                 claimId = input.claimId,
                 claim = input.claimText,
                 lean = lean,
@@ -142,8 +172,10 @@ class AggregatorAgent @Inject constructor(
                 dominantField = field,
                 temporalWarning = input.temporalWarning
             )
+            
+            AggregatorOutput(verdict, needsMorePapers, suggestedQueries)
         } catch (e: Exception) {
-            Verdict(
+            val verdict = Verdict(
                 claimId = input.claimId,
                 claim = input.claimText,
                 lean = Stance.NEUTRAL,
@@ -158,6 +190,7 @@ class AggregatorAgent @Inject constructor(
                 dominantField = "Unknown",
                 temporalWarning = input.temporalWarning
             )
+            AggregatorOutput(verdict, false, null)
         }
     }
 

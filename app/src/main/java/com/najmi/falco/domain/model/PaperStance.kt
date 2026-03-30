@@ -11,5 +11,7 @@ data class PaperStance(
     val criticChallenge: String? = null,
     val finalStance: Stance? = null,
     val groundingScore: Float? = null,
-    val ragScore: Float? = null
+    val ragScore: Float? = null,
+    val isConsensus: Boolean = false,
+    val isOutlier: Boolean = false
 )

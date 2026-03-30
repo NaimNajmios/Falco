@@ -2,7 +2,10 @@ package com.najmi.falco.pipeline
 
 import com.najmi.falco.agent.AggregatorAgent
 import com.najmi.falco.agent.AggregatorInput
+import com.najmi.falco.agent.AggregatorOutput
 import com.najmi.falco.agent.ClaimClassifierAgent
+import com.najmi.falco.agent.CrossReferenceAgent
+import com.najmi.falco.agent.CrossReferenceInput
 import com.najmi.falco.agent.QueryExpansionAgent
 import com.najmi.falco.agent.SmartStanceActor
 import com.najmi.falco.agent.SmartStanceActorInput
@@ -23,6 +26,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -34,6 +39,7 @@ class FalcoOrchestrator @Inject constructor(
     private val paperQualityGate: PaperQualityGate,
     private val temporalAnalyzer: TemporalFreshnessAnalyzer,
     private val stanceActor: SmartStanceActor,
+    private val crossReferenceAgent: CrossReferenceAgent,
     private val stanceCritic: StanceCriticAgent,
     private val algorithmicGrounding: AlgorithmicGrounding,
     private val aggregator: AggregatorAgent,
@@ -107,9 +113,26 @@ class FalcoOrchestrator @Inject constructor(
             stageStart = System.currentTimeMillis()
             send(VerificationState.InProgress(VerificationStage.ACTOR_CLASSIFICATION, "Classifying stances across ${analyzedPapers.size} papers..."))
             
-            val actorResults = analyzedPapers.map { qualityPaper ->
-                async { stanceActor.execute(SmartStanceActorInput(claim.text, qualityPaper.paper)) }
-            }.awaitAll()
+            val backpressureQueue = PaperBackpressureQueue()
+            val actorResults = mutableListOf<Result<PaperStance>>()
+            
+            launch {
+                analyzedPapers.forEach { qualityPaper ->
+                    backpressureQueue.send(qualityPaper.paper)
+                }
+                backpressureQueue.close()
+            }
+            
+            val producer = launch {
+                backpressureQueue.papersFlow.collect { paper ->
+                    val result = stanceActor.execute(SmartStanceActorInput(claim.text, paper))
+                    synchronized(actorResults) {
+                        actorResults.add(result)
+                    }
+                }
+            }
+            
+            producer.join()
             
             val actorFailures = actorResults.count { it.isFailure }
             if (actorFailures > 0) {
@@ -128,9 +151,18 @@ class FalcoOrchestrator @Inject constructor(
             DebugLogger.stage("ACTOR_CLASSIFICATION (${actorStances.size} stances)", System.currentTimeMillis() - stageStart)
 
             stageStart = System.currentTimeMillis()
+            send(VerificationState.InProgress(VerificationStage.CROSS_REFERENCE, "Analyzing cross-paper consensus..."))
+            
+            val crossRefResult = crossReferenceAgent.execute(
+                CrossReferenceInput(claim.text, actorStances)
+            )
+            val enrichedStances = crossRefResult.getOrNull()?.enrichedStances ?: actorStances
+            DebugLogger.stage("CROSS_REFERENCE (${enrichedStances.count { it.isConsensus }} consensus, ${enrichedStances.count { it.isOutlier }} outliers)", System.currentTimeMillis() - stageStart)
+
+            stageStart = System.currentTimeMillis()
             send(VerificationState.InProgress(VerificationStage.CRITIC_REVIEW, "Critic reviewing stances..."))
             
-            val criticResults = actorStances.map { stanceCritic.execute(StanceCriticInput(claim.text, it)) }
+            val criticResults = enrichedStances.map { stanceCritic.execute(StanceCriticInput(claim.text, it)) }
             
             val criticFailures = criticResults.count { it.isFailure }
             if (criticFailures > 0) {
@@ -142,37 +174,106 @@ class FalcoOrchestrator @Inject constructor(
 
             stageStart = System.currentTimeMillis()
             send(VerificationState.InProgress(VerificationStage.GROUNDING, "Verifying reasoning against abstracts..."))
-            val groundedStances = algorithmicGrounding.verify(criticStances)
-            DebugLogger.stage("GROUNDING", System.currentTimeMillis() - stageStart)
+            var allGroundedStances = algorithmicGrounding.verify(criticStances)
+            var totalPapersRetrieved = papers.size
+            var totalPapersPassed = analyzedPapers.size
+            var suggestedQueries: List<String>? = null
+            val maxAdaptiveRetries = 2
+            var adaptiveRetryCount = 0
 
-            stageStart = System.currentTimeMillis()
-            send(VerificationState.InProgress(VerificationStage.AGGREGATING, "Building verdict..."))
-            val supportingCount = groundedStances.count { it.finalStance == Stance.SUPPORTS }
-            val opposingCount = groundedStances.count { it.finalStance == Stance.OPPOSES }
-            val neutralCount = groundedStances.count { it.finalStance == Stance.NEUTRAL }
-
-            val aggregatorInput = AggregatorInput(
-                claimId = claim.id,
-                claimText = claim.text,
-                claimType = claim.type,
-                stances = groundedStances,
-                totalRetrieved = papers.size,
-                totalPapersPassedGate = analyzedPapers.size,
-                temporalWarning = temporalWarning,
-                supportingCount = supportingCount,
-                opposingCount = opposingCount,
-                neutralCount = neutralCount
-            )
+            var aggregatorOutput: AggregatorOutput? = null
             
-            val verdictResult = aggregator.execute(aggregatorInput)
-            val verdict = verdictResult.getOrElse { e ->
-                DebugLogger.e("[PIPELINE] Aggregation failed: ${e.message}")
-                send(VerificationState.Error(VerificationStage.AGGREGATING, "Failed to build verdict: ${getUserFriendlyError(e)}"))
-                return@channelFlow
+            while (adaptiveRetryCount < maxAdaptiveRetries) {
+                stageStart = System.currentTimeMillis()
+                send(VerificationState.InProgress(VerificationStage.AGGREGATING, "Building verdict..."))
+                val supportingCount = allGroundedStances.count { it.finalStance == Stance.SUPPORTS }
+                val opposingCount = allGroundedStances.count { it.finalStance == Stance.OPPOSES }
+                val neutralCount = allGroundedStances.count { it.finalStance == Stance.NEUTRAL }
+
+                val aggregatorInput = AggregatorInput(
+                    claimId = claim.id,
+                    claimText = claim.text,
+                    claimType = claim.type,
+                    stances = allGroundedStances,
+                    totalRetrieved = totalPapersRetrieved,
+                    totalPapersPassedGate = totalPapersPassed,
+                    temporalWarning = temporalWarning,
+                    supportingCount = supportingCount,
+                    opposingCount = opposingCount,
+                    neutralCount = neutralCount,
+                    confidenceThreshold = 0.5f
+                )
+                
+                val result = aggregator.execute(aggregatorInput)
+                aggregatorOutput = result.getOrElse { e ->
+                    DebugLogger.e("[PIPELINE] Aggregation failed: ${e.message}")
+                    send(VerificationState.Error(VerificationStage.AGGREGATING, "Failed to build verdict: ${getUserFriendlyError(e)}"))
+                    return@channelFlow
+                }
+
+                if (!aggregatorOutput!!.needsMorePapers || adaptiveRetryCount >= maxAdaptiveRetries) {
+                    break
+                }
+                
+                suggestedQueries = aggregatorOutput!!.suggestedQueries
+                adaptiveRetryCount++
+                DebugLogger.d("[PIPELINE] Adaptive retrieval: ${suggestedQueries?.size ?: 0} new queries, retry $adaptiveRetryCount/$maxAdaptiveRetries")
+                
+                if (!suggestedQueries.isNullOrEmpty()) {
+                    send(VerificationState.InProgress(VerificationStage.ADAPTIVE_RETRIEVAL, "Fetching additional evidence (${adaptiveRetryCount}/${maxAdaptiveRetries})..."))
+                    
+                    val additionalPapers = paperRepo.searchAll(suggestedQueries)
+                    val additionalQualityPapers = paperQualityGate.filter(additionalPapers, claim.type)
+                    val additionalAnalyzedPapers = temporalAnalyzer.analyze(additionalQualityPapers, claim.type)
+                    
+                    if (additionalAnalyzedPapers.isNotEmpty()) {
+                        val additionalBackpressureQueue = PaperBackpressureQueue()
+                        val additionalActorResults = mutableListOf<Result<PaperStance>>()
+                        
+                        launch {
+                            additionalAnalyzedPapers.forEach { qualityPaper ->
+                                additionalBackpressureQueue.send(qualityPaper.paper)
+                            }
+                            additionalBackpressureQueue.close()
+                        }
+                        
+                        val additionalProducer = launch {
+                            additionalBackpressureQueue.papersFlow.collect { paper ->
+                                val actorResult = stanceActor.execute(SmartStanceActorInput(claim.text, paper))
+                                synchronized(additionalActorResults) {
+                                    additionalActorResults.add(actorResult)
+                                }
+                            }
+                        }
+                        
+                        additionalProducer.join()
+                        
+                        val additionalActorStances = additionalActorResults
+                            .mapNotNull { it.getOrNull() }
+                            .filter { it.confidence > 0.3f }
+                        
+                        if (additionalActorStances.isNotEmpty()) {
+                            val additionalCrossRefResult = crossReferenceAgent.execute(
+                                CrossReferenceInput(claim.text, additionalActorStances)
+                            )
+                            val additionalEnrichedStances = additionalCrossRefResult.getOrNull()?.enrichedStances ?: additionalActorStances
+                            
+                            val additionalCriticResults = additionalEnrichedStances.map { stanceCritic.execute(StanceCriticInput(claim.text, it)) }
+                            val additionalCriticStances = additionalCriticResults.mapNotNull { it.getOrNull() }
+                            val additionalGroundedStances = algorithmicGrounding.verify(additionalCriticStances)
+                            
+                            allGroundedStances = allGroundedStances + additionalGroundedStances
+                            totalPapersRetrieved += additionalPapers.size
+                            totalPapersPassed += additionalAnalyzedPapers.size
+                        }
+                    }
+                }
             }
 
+            val verdict = aggregatorOutput!!.verdict
+
             verdictRepo.save(verdict)
-            DebugLogger.stage("AGGREGATING", System.currentTimeMillis() - stageStart)
+            DebugLogger.stage("AGGREGATING (${adaptiveRetryCount} adaptive retries)", System.currentTimeMillis() - stageStart)
             DebugLogger.d("[PIPELINE] Completed in ${System.currentTimeMillis() - totalStart}ms")
             send(VerificationState.Success(verdict))
 

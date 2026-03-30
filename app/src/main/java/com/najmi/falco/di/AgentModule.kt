@@ -2,6 +2,7 @@ package com.najmi.falco.di
 
 import com.najmi.falco.agent.AggregatorAgent
 import com.najmi.falco.agent.ClaimClassifierAgent
+import com.najmi.falco.agent.CrossReferenceAgent
 import com.najmi.falco.agent.QueryExpansionAgent
 import com.najmi.falco.agent.SmartStanceActor
 import com.najmi.falco.agent.StanceActorAgent
@@ -95,4 +96,8 @@ object AgentModule {
         earlyStopEvaluator = earlyStopEvaluator,
         quotaManager = quotaManager
     )
+
+    @Provides
+    @Singleton
+    fun provideCrossReferenceAgent(): CrossReferenceAgent = CrossReferenceAgent()
 }
