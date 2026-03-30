@@ -19,7 +19,7 @@ import com.najmi.falco.data.local.entity.VerdictEntity
         PaperStanceEntity::class,
         QuotaEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(FalcoTypeConverters::class)

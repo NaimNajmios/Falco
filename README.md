@@ -19,7 +19,7 @@ FALCO's core is the `FalcoOrchestrator`, which manages a sequence of specialized
 3.  **Multi-Source Retrieval**: Interfaces with academic repositories like **OpenAlex** and **Semantic Scholar** to fetch relevant peer-reviewed papers.
 4.  **Paper Quality Gate**: Automatically scores papers based on citation tiers, field-specific freshness (AI/ML vs. Medicine vs. History), and open-access status.
 5.  **Temporal Freshness Analysis**: Detects when evidence is "stale" for rapidly evolving fields and generates contextual alerts.
-6.  **Stance Actor**: Independently analyzes filtered papers to determine their stance (Support, Refute, or Neutral) relative to the claim.
+6.  **Smart Stance Actor**: Performs **incremental chunk analysis** on long papers with **early stopping** capabilities. If a definitive stance is found early, it halts analysis to minimize token usage and latency.
 7.  **Aggregator**: Synthesizes all gathered evidence, weighting confidence levels and source quality to produce a final Dossier.
 
 ## 🛡 Security & Resilience
@@ -32,19 +32,21 @@ FALCO is built for production-grade reliability and data privacy:
 
 ## ✨ Features
 
+-   **Intelligent Optimization**: Early-stopping stance analysis and incremental chunking for cost-effective verification.
+-   **Persistent Dossier History**: Full CRUD support for past claims, allowing users to browse, re-examine, or delete verification records.
 -   **Field-Aware Verification**: Specialized thresholds for different academic domains (e.g., higher freshness requirements for AI/ML).
 -   **Expanded LLM Ecosystem**: Support for **Gemini**, **Groq**, **Cerebras**, **Cohere**, **Mistral**, and **OpenRouter**.
--   **Smart Context Chunking**: High-performance pipeline optimized for long-form academic abstracts and metadata.
 -   **Background Verification**: Support for high-latency tasks using **WorkManager**, ensuring verifications continue even if the app is closed.
--   **Premium UI/UX**: A sleek, dark-themed interface built with Jetpack Compose, featuring real-time stage tracking in the `PipelineScreen`.
+-   **Premium UI/UX**: A sleek, dark-themed interface with real-time stage tracking and persistent state management.
 
 ## 🛠 Tech Stack
 
 -   **Language**: Kotlin
 -   **UI Framework**: Jetpack Compose (Material 3)
 -   **Architecture**: Clean Architecture + MVVM + Agent-Oriented Design
+-   **Persistence**: Room (Dossier history, Quota tracking, and Claims)
+-   **Security**: AndroidX Crypto (EncryptedSharedPreferences)
 -   **Remote**: Ktor (Multiplatform-ready HTTP client)
--   **Local Storage**: Room (Persistent storage for Dossiers and Quotas)
 -   **Background Tasks**: Android WorkManager
 -   **Dependency Injection**: Hilt
 -   **Asynchrony**: Kotlin Coroutines & Flow
