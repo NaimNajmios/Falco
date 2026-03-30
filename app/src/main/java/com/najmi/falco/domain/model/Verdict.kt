@@ -14,5 +14,18 @@ data class Verdict(
     val neutralCount: Int,
     val dominantField: String,
     val temporalWarning: String?,
-    val completedAt: Long = System.currentTimeMillis()
-)
+    val completedAt: Long = System.currentTimeMillis(),
+    val analysisMetadata: AnalysisMetadata = AnalysisMetadata(),
+    val uncertaintyInfo: UncertaintyInfo = UncertaintyInfo()
+) {
+    val consensusInfo: ConsensusInfo
+        get() = ConsensusInfo(
+            totalPapers = stances.size,
+            supportingCount = supportingCount,
+            opposingCount = opposingCount,
+            neutralCount = neutralCount
+        )
+
+    val certaintyLevel: CertaintyLevel
+        get() = CertaintyLevel.fromConfidence(confidence)
+}

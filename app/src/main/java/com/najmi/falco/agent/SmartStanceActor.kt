@@ -13,7 +13,10 @@ import javax.inject.Singleton
 data class SmartStanceActorInput(
     val claimText: String,
     val paper: Paper,
-    val enableSmartChunking: Boolean = true
+    val enableSmartChunking: Boolean = true,
+    val enableIncrementalAnalysis: Boolean = true,
+    val confidenceThreshold: Float = SmartStanceActor.DEFAULT_CONFIDENCE_THRESHOLD,
+    val minChunks: Int = SmartStanceActor.DEFAULT_MIN_CHUNKS
 )
 
 @Singleton
@@ -22,11 +25,14 @@ class SmartStanceActor @Inject constructor(
     private val assembler: BatchAssembler,
     private val providerRouter: TieredProviderRouter,
     private val earlyStopEvaluator: EarlyStopEvaluator,
-    private val quotaManager: FreeTierQuotaManager
+    private val quotaManager: FreeTierQuotaManager,
+    private val incrementalAnalyzer: IncrementalChunkAnalyzer
 ) : IFalcoAgent<SmartStanceActorInput, PaperStance> {
 
     companion object {
         private const val TAG = "SmartStanceActor"
+        const val DEFAULT_CONFIDENCE_THRESHOLD = 0.75f
+        const val DEFAULT_MIN_CHUNKS = 1
     }
 
     override val agentName = "SmartStanceActor"
@@ -63,51 +69,152 @@ class SmartStanceActor @Inject constructor(
                 Log.w(TAG, "Chunk validation warnings: ${validation.warnings}")
             }
 
-            val batchPrompt = assembler.assemble(
-                claim = input.claimText,
-                paperTitle = input.paper.title,
-                paperYear = input.paper.year,
-                chunks = chunks
-            )
-
-            val provider = preferredProvider ?: providerRouter.selectProvider(batchPrompt.estimatedInputTokens)
+            val sortedChunks = chunks.sortedBy { it.priority }
             
-            val routeResult = providerRouter.routeWithFastFallback(
-                prompt = batchPrompt.prompt,
-                tokenCount = batchPrompt.estimatedInputTokens
-            )
+            val incrementalResult = if (input.enableIncrementalAnalysis) {
+                analyzeIncrementally(
+                    sortedChunks = sortedChunks,
+                    claim = input.claimText,
+                    paper = input.paper,
+                    confidenceThreshold = input.confidenceThreshold,
+                    minChunks = input.minChunks,
+                    preferredProvider = preferredProvider,
+                    startTime = startTime
+                )
+            } else {
+                analyzeBatch(
+                    sortedChunks = sortedChunks,
+                    claim = input.claimText,
+                    paper = input.paper,
+                    preferredProvider = preferredProvider,
+                    startTime = startTime
+                )
+            }
 
-            val elapsed = System.currentTimeMillis() - startTime
-            DebugLogger.stage("SMART_STANCE_ANALYSIS", elapsed)
+            updateAnalysisState(incrementalResult)
 
-            routeResult.fold(
-                onSuccess = { result ->
-                    val smartResult = SmartStanceParser.parseWithFallback(result.response.text)
-                        .copy(
-                            providerUsed = result.provider.name,
-                            tokensConsumed = result.response.usage.totalTokens
-                        )
+            Log.d(TAG, "Stance analysis completed: ${incrementalResult.overallStance} " +
+                    "(confidence: ${incrementalResult.overallConfidence}, " +
+                    "chunks: ${incrementalResult.chunksUsed}, " +
+                    "tokens: ${incrementalResult.tokensConsumed}, " +
+                    "earlyStop: ${incrementalResult.didStopEarly}, " +
+                    "time: ${System.currentTimeMillis() - startTime}ms)")
 
-                    updateAnalysisState(smartResult)
-
-                    Log.d(TAG, "Smart stance analysis completed: ${smartResult.overallStance} " +
-                            "(confidence: ${smartResult.overallConfidence}, " +
-                            "chunks: ${smartResult.chunksUsed}, " +
-                            "provider: ${result.provider.name}, " +
-                            "tokens: ${result.response.usage.totalTokens}, " +
-                            "time: ${elapsed}ms)")
-
-                    Result.success(smartResult.toPaperStance(input.paper))
-                },
-                onFailure = { error ->
-                    Log.e(TAG, "Smart stance analysis failed: ${error.message}")
-                    Result.failure(error)
-                }
-            )
+            Result.success(incrementalResult.toPaperStance(input.paper))
         } catch (e: Exception) {
             Log.e(TAG, "Smart stance actor error: ${e.message}", e)
             Result.failure(e)
         }
+    }
+
+    private suspend fun analyzeIncrementally(
+        sortedChunks: List<EvidenceChunk>,
+        claim: String,
+        paper: Paper,
+        confidenceThreshold: Float,
+        minChunks: Int,
+        preferredProvider: LlmProvider?,
+        startTime: Long
+    ): SmartStanceResult {
+        var cumulativeResult: SmartStanceResult? = null
+        var totalTokens = 0
+        var index = 0
+        var processedChunks = 0
+        
+        while (index < sortedChunks.size) {
+            val chunk = sortedChunks[index]
+            
+            val chunkAnalysisResult = incrementalAnalyzer.analyzeSingleChunk(
+                chunk = chunk,
+                claim = claim,
+                paper = paper,
+                preferredProvider = preferredProvider
+            )
+            
+            if (chunkAnalysisResult.isSuccess) {
+                val chunkResult = chunkAnalysisResult.getOrThrow()
+                processedChunks++
+                totalTokens += chunkResult.tokensConsumed
+                
+                cumulativeResult = incrementalAnalyzer.mergeToSmartStance(cumulativeResult, chunkResult)
+                
+                val currentResult = cumulativeResult!!
+                val stanceAgreement = currentResult.stanceAgreement()
+                
+                val stopDecision = incrementalAnalyzer.shouldStopEarly(
+                    currentConfidence = currentResult.overallConfidence,
+                    stanceAgreement = stanceAgreement,
+                    chunksAnalyzed = processedChunks,
+                    minChunks = minChunks,
+                    confidenceThreshold = confidenceThreshold
+                )
+                
+                if (stopDecision.shouldStop) {
+                    val elapsed = System.currentTimeMillis() - startTime
+                    DebugLogger.stage("INCREMENTAL_ANALYSIS", elapsed)
+                    Log.d(TAG, "EARLY STOP at chunk ${index + 1}: ${stopDecision.reason}")
+                    
+                    return currentResult.copy(
+                        didStopEarly = true,
+                        tokensConsumed = totalTokens
+                    )
+                }
+            } else {
+                Log.w(TAG, "Failed to analyze chunk ${chunk.id}, continuing...")
+            }
+            
+            index++
+        }
+
+        val elapsed = System.currentTimeMillis() - startTime
+        DebugLogger.stage("INCREMENTAL_ANALYSIS", elapsed)
+        
+        return cumulativeResult?.copy(tokensConsumed = totalTokens) ?: SmartStanceResult(
+            overallStance = com.najmi.falco.domain.model.Stance.NEUTRAL,
+            overallConfidence = 0.3f,
+            excerptAnalyses = emptyList(),
+            reasoning = "Failed to analyze any chunks",
+            chunksUsed = 0
+        )
+    }
+
+    private suspend fun analyzeBatch(
+        sortedChunks: List<EvidenceChunk>,
+        claim: String,
+        paper: Paper,
+        preferredProvider: LlmProvider?,
+        startTime: Long
+    ): SmartStanceResult {
+        val batchPrompt = assembler.assemble(
+            claim = claim,
+            paperTitle = paper.title,
+            paperYear = paper.year,
+            chunks = sortedChunks
+        )
+
+        val provider = preferredProvider ?: providerRouter.selectProvider(batchPrompt.estimatedInputTokens)
+        
+        val routeResult = providerRouter.routeWithFastFallback(
+            prompt = batchPrompt.prompt,
+            tokenCount = batchPrompt.estimatedInputTokens
+        )
+
+        val elapsed = System.currentTimeMillis() - startTime
+        DebugLogger.stage("SMART_STANCE_ANALYSIS", elapsed)
+
+        return routeResult.getOrNull()?.let { result ->
+            SmartStanceParser.parseWithFallback(result.response.text)
+                .copy(
+                    providerUsed = result.provider.name,
+                    tokensConsumed = result.response.usage.totalTokens
+                )
+        } ?: SmartStanceResult(
+            overallStance = com.najmi.falco.domain.model.Stance.NEUTRAL,
+            overallConfidence = 0.3f,
+            excerptAnalyses = emptyList(),
+            reasoning = "Failed to analyze paper",
+            chunksUsed = 0
+        )
     }
 
     private fun updateAnalysisState(result: SmartStanceResult) {

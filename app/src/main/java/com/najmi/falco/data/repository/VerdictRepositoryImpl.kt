@@ -4,12 +4,16 @@ import com.najmi.falco.data.local.dao.ClaimDao
 import com.najmi.falco.data.local.dao.VerdictDao
 import com.najmi.falco.data.local.entity.ClaimEntity
 import com.najmi.falco.data.local.entity.VerdictEntity
+import com.najmi.falco.domain.model.AnalysisMetadata
 import com.najmi.falco.domain.model.Stance
+import com.najmi.falco.domain.model.UncertaintyInfo
 import com.najmi.falco.domain.model.Verdict
 import com.najmi.falco.domain.repository.IVerdictRepository
 import com.najmi.falco.domain.repository.RecentClaim
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -18,6 +22,8 @@ class VerdictRepositoryImpl @Inject constructor(
     private val claimDao: ClaimDao,
     private val verdictDao: VerdictDao
 ) : IVerdictRepository {
+    
+    private val json = Json { ignoreUnknownKeys = true }
 
     override suspend fun save(verdict: Verdict) {
         claimDao.insert(
@@ -38,13 +44,35 @@ class VerdictRepositoryImpl @Inject constructor(
                 totalPapersRetrieved = verdict.totalPapersRetrieved,
                 totalPapersPassedGate = verdict.totalPapersPassedGate,
                 temporalWarning = verdict.temporalWarning,
-                completedAt = verdict.completedAt
+                completedAt = verdict.completedAt,
+                analysisMetadataJson = json.encodeToString(verdict.analysisMetadata),
+                uncertaintyInfoJson = json.encodeToString(verdict.uncertaintyInfo)
             )
         )
     }
 
     override suspend fun getByClaimId(claimId: String): Verdict? {
         val entity = verdictDao.getVerdictForClaim(claimId) ?: return null
+        return mapEntityToVerdict(entity)
+    }
+
+    override fun getAllVerdicts(): Flow<List<Verdict>> {
+        return verdictDao.getAllVerdicts().map { list ->
+            list.map { vw ->
+                mapEntityToVerdict(vw.verdict)
+            }
+        }
+    }
+
+    private fun mapEntityToVerdict(entity: VerdictEntity): Verdict {
+        val analysisMetadata = entity.analysisMetadataJson?.let {
+            try { json.decodeFromString<AnalysisMetadata>(it) } catch (e: Exception) { AnalysisMetadata() }
+        } ?: AnalysisMetadata()
+        
+        val uncertaintyInfo = entity.uncertaintyInfoJson?.let {
+            try { json.decodeFromString<UncertaintyInfo>(it) } catch (e: Exception) { UncertaintyInfo() }
+        } ?: UncertaintyInfo()
+        
         return Verdict(
             claimId = entity.claimId,
             claim = "",
@@ -59,31 +87,10 @@ class VerdictRepositoryImpl @Inject constructor(
             neutralCount = 0,
             dominantField = "",
             temporalWarning = entity.temporalWarning,
-            completedAt = entity.completedAt
+            completedAt = entity.completedAt,
+            analysisMetadata = analysisMetadata,
+            uncertaintyInfo = uncertaintyInfo
         )
-    }
-
-    override fun getAllVerdicts(): Flow<List<Verdict>> {
-        return verdictDao.getAllVerdicts().map { list ->
-            list.map { vw ->
-                Verdict(
-                    claimId = vw.verdict.claimId,
-                    claim = "",
-                    lean = Stance.valueOf(vw.verdict.lean),
-                    confidence = vw.verdict.confidence,
-                    summary = vw.verdict.summary,
-                    stances = emptyList(),
-                    totalPapersRetrieved = vw.verdict.totalPapersRetrieved,
-                    totalPapersPassedGate = vw.verdict.totalPapersPassedGate,
-                    supportingCount = 0,
-                    opposingCount = 0,
-                    neutralCount = 0,
-                    dominantField = "",
-                    temporalWarning = vw.verdict.temporalWarning,
-                    completedAt = vw.verdict.completedAt
-                )
-            }
-        }
     }
 
     override fun getRecentClaims(): Flow<List<RecentClaim>> {

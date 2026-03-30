@@ -25,9 +25,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.najmi.falco.domain.model.AnalysisDepth
 import com.najmi.falco.domain.model.PaperStance
 import com.najmi.falco.domain.model.Stance
 import com.najmi.falco.domain.model.Verdict
+import com.najmi.falco.ui.components.AnalysisDepthMeter
+import com.najmi.falco.ui.components.ChunksExplorer
+import com.najmi.falco.ui.components.ConfidenceFactorsTooltips
+import com.najmi.falco.ui.components.ConfidenceGauge
+import com.najmi.falco.ui.components.ConsensusIndicator
+import com.najmi.falco.ui.components.ProvenanceFooter
+import com.najmi.falco.ui.components.TokenUsageCard
+import com.najmi.falco.ui.components.UncertaintySection
 import com.najmi.falco.ui.theme.LocalFalcoPalette
 import com.najmi.falco.ui.theme.FalcoDimens
 import com.najmi.falco.ui.theme.FalcoTypography
@@ -39,17 +48,17 @@ fun VerdictDetailScreen(
     verdict: Verdict,
     onBack: () -> Unit
 ) {
+    val palette = LocalFalcoPalette.current
     val stanceColor = when (verdict.lean) {
-        Stance.SUPPORTS -> LocalFalcoPalette.current.stanceSupports
-        Stance.NEUTRAL -> LocalFalcoPalette.current.stanceNeutral
-        Stance.OPPOSES -> LocalFalcoPalette.current.stanceOpposes
+        Stance.SUPPORTS -> palette.stanceSupports
+        Stance.NEUTRAL -> palette.stanceNeutral
+        Stance.OPPOSES -> palette.stanceOpposes
     }
-    val confidencePct = (verdict.confidence * 100).roundToInt()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(LocalFalcoPalette.current.bg)
+            .background(palette.bg)
             .padding(24.dp)
             .verticalScroll(rememberScrollState())
     ) {
@@ -63,12 +72,12 @@ fun VerdictDetailScreen(
             Text(
                 "VERDICT",
                 style = FalcoTypography.labelSmall,
-                color = LocalFalcoPalette.current.textGhost
+                color = palette.textGhost
             )
             Text(
                 "← BACK",
                 style = FalcoTypography.labelSmall,
-                color = LocalFalcoPalette.current.textMuted,
+                color = palette.textMuted,
                 modifier = Modifier.clickable { onBack() }
             )
         }
@@ -79,56 +88,99 @@ fun VerdictDetailScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        Text("$confidencePct%  CONFIDENCE", style = FalcoTypography.headlineSmall, color = LocalFalcoPalette.current.textBody)
+        ConfidenceGauge(
+            confidence = verdict.confidence,
+            certaintyLevel = verdict.certaintyLevel
+        )
+
         Spacer(Modifier.height(8.dp))
 
-        ConfidenceSegmentBar(confidence = verdict.confidence)
-
-        Spacer(Modifier.height(8.dp))
-
-        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(LocalFalcoPalette.current.divider))
+        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(palette.divider))
 
         Spacer(Modifier.height(24.dp))
 
-        MetadataBlock(verdict = verdict)
+        TokenUsageCard(metadata = verdict.analysisMetadata)
+
+        Spacer(Modifier.height(16.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+        AnalysisDepthMeter(
+            depth = verdict.stances.firstOrNull()?.analysisDepth
+                ?: AnalysisDepth.STANDARD,
+                    chunksAnalyzed = verdict.stances.sumOf { it.chunksAnalyzed.size }
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                ConsensusIndicator(consensusInfo = verdict.consensusInfo)
+            }
+        }
 
         verdict.temporalWarning?.let { warning ->
             Spacer(Modifier.height(16.dp))
             Box(
                 modifier = Modifier.fillMaxWidth()
-                    .background(LocalFalcoPalette.current.surface)
-                    .border(1.dp, LocalFalcoPalette.current.chip, FalcoZeroShape)
+                    .background(palette.surface)
+                    .border(1.dp, palette.chip, FalcoZeroShape)
                     .padding(12.dp)
             ) {
-                Text(warning, style = FalcoTypography.bodySmall, color = LocalFalcoPalette.current.textMuted)
+                Text(warning, style = FalcoTypography.bodySmall, color = palette.textMuted)
             }
+        }
+
+        val allFactors = verdict.stances.flatMap { it.confidenceFactors }.distinctBy { it.type + it.value }
+        if (allFactors.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            ConfidenceFactorsTooltips(factors = allFactors.take(4))
+        }
+
+        val totalUncertainty = verdict.uncertaintyInfo
+        if (totalUncertainty.gaps.isNotEmpty() || totalUncertainty.qualityWarnings.isNotEmpty() ||
+            totalUncertainty.recencyAlert != null || totalUncertainty.fundingDisclosure != null
+        ) {
+            Spacer(Modifier.height(16.dp))
+            UncertaintySection(uncertaintyInfo = totalUncertainty)
         }
 
         Spacer(Modifier.height(24.dp))
 
-        Text("Synthesis of grounding data.", style = FalcoTypography.headlineMedium, color = LocalFalcoPalette.current.textPrimary)
+        Text("Synthesis of grounding data.", style = FalcoTypography.headlineMedium, color = palette.textPrimary)
         Spacer(Modifier.height(16.dp))
 
         Box(
             modifier = Modifier.fillMaxWidth()
-                .background(LocalFalcoPalette.current.surface)
-                .border(1.dp, LocalFalcoPalette.current.divider, FalcoZeroShape)
+                .background(palette.surface)
+                .border(1.dp, palette.divider, FalcoZeroShape)
                 .padding(16.dp)
         ) {
-            Text(verdict.summary, style = FalcoTypography.bodyMedium, color = LocalFalcoPalette.current.textBody)
+            Text(verdict.summary, style = FalcoTypography.bodyMedium, color = palette.textBody)
         }
 
         Spacer(Modifier.height(32.dp))
 
-        Text("EVIDENCE LIST [N=${verdict.stances.size}]", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
+        Text("EVIDENCE LIST [N=${verdict.stances.size}]", style = FalcoTypography.labelSmall, color = palette.textGhost)
         Spacer(Modifier.height(16.dp))
 
         verdict.stances.sortedByDescending { it.paper.citationCount }.forEach { stance ->
             EvidenceRow(stance = stance)
             Spacer(Modifier.height(1.dp))
-            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(LocalFalcoPalette.current.divider))
+            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(palette.divider))
             Spacer(Modifier.height(1.dp))
         }
+
+        val primaryProvider = verdict.stances.firstOrNull()?.providerUsed
+        val primaryModel = verdict.stances.firstOrNull()?.modelUsed
+
+        Spacer(Modifier.height(24.dp))
+
+        ProvenanceFooter(
+            metadata = verdict.analysisMetadata,
+            providerUsed = primaryProvider ?: "unknown",
+            modelUsed = primaryModel
+        )
 
         Spacer(Modifier.height(80.dp))
     }
@@ -222,6 +274,25 @@ private fun EvidenceRow(stance: PaperStance) {
                 String.format("%.2f", groundingScore),
                 style = FalcoTypography.bodySmall.copy(fontWeight = FontWeight.Medium),
                 color = LocalFalcoPalette.current.textBody
+            )
+            stance.didStopEarly?.let {
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Early stop",
+                    style = FalcoTypography.labelSmall,
+                    color = LocalFalcoPalette.current.textGhost
+                )
+            }
+        }
+
+        if (stance.chunksAnalyzed.isNotEmpty()) {
+            Spacer(Modifier.height(4.dp))
+            var chunksExpanded by remember { mutableStateOf(false) }
+            ChunksExplorer(
+                chunks = stance.chunksAnalyzed,
+                expanded = chunksExpanded,
+                onToggle = { chunksExpanded = !chunksExpanded },
+                modifier = Modifier.padding(start = 24.dp)
             )
         }
 

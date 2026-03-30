@@ -13,5 +13,11 @@ data class PaperStance(
     val groundingScore: Float? = null,
     val ragScore: Float? = null,
     val isConsensus: Boolean = false,
-    val isOutlier: Boolean = false
+    val isOutlier: Boolean = false,
+    val chunksAnalyzed: List<AnalyzedChunk> = emptyList(),
+    val analysisDepth: AnalysisDepth = AnalysisDepth.STANDARD,
+    val providerUsed: String = "unknown",
+    val modelUsed: String? = null,
+    val didStopEarly: Boolean = false,
+    val confidenceFactors: List<ConfidenceFactor> = emptyList()
 )

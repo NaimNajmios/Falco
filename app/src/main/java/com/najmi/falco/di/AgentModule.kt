@@ -11,6 +11,7 @@ import com.najmi.falco.chunking.BatchAssembler
 import com.najmi.falco.chunking.ContentChunker
 import com.najmi.falco.chunking.EarlyStopEvaluator
 import com.najmi.falco.chunking.FreeTierQuotaManager
+import com.najmi.falco.chunking.IncrementalChunkAnalyzer
 import com.najmi.falco.chunking.TieredProviderRouter
 import com.najmi.falco.data.repository.OutletCredibilityRepository
 import com.najmi.falco.pipeline.AlgorithmicGrounding
@@ -88,13 +89,15 @@ object AgentModule {
         assembler: BatchAssembler,
         providerRouter: TieredProviderRouter,
         earlyStopEvaluator: EarlyStopEvaluator,
-        quotaManager: FreeTierQuotaManager
+        quotaManager: FreeTierQuotaManager,
+        incrementalAnalyzer: IncrementalChunkAnalyzer
     ): SmartStanceActor = SmartStanceActor(
         chunker = chunker,
         assembler = assembler,
         providerRouter = providerRouter,
         earlyStopEvaluator = earlyStopEvaluator,
-        quotaManager = quotaManager
+        quotaManager = quotaManager,
+        incrementalAnalyzer = incrementalAnalyzer
     )
 
     @Provides

@@ -1,5 +1,7 @@
 package com.najmi.falco.chunking
 
+import com.najmi.falco.domain.model.AnalyzedChunk
+
 enum class ChunkSource {
     ABSTRACT,
     CONCLUSION,
@@ -26,6 +28,27 @@ data class EvidenceChunk(
         const val ABSTRACT_MAX_TOKENS = 500
         const val CONCLUSION_MAX_TOKENS = 800
         const val BODY_PARAGRAPH_MAX_TOKENS = 600
+
+        fun estimateFullTextTokens(paperAbstract: String, year: Int?): Int {
+            val baseEstimate = paperAbstract.length / 4
+            val yearFactor = when {
+                year == null -> 1.0
+                year < 2000 -> 0.7
+                year < 2010 -> 0.85
+                else -> 1.0
+            }
+            return (baseEstimate * 10 * yearFactor).toInt().coerceAtLeast(3000)
+        }
+    }
+
+    fun toAnalyzedChunk(keyEvidence: String? = null, confidence: Float? = null): AnalyzedChunk {
+        return AnalyzedChunk(
+            content = content,
+            sourceSection = sourceSection.name,
+            estimatedTokens = estimatedTokens,
+            keyEvidence = keyEvidence,
+            confidence = confidence
+        )
     }
 }
 

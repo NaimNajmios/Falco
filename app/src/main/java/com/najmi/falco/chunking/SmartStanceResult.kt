@@ -9,7 +9,8 @@ data class SmartStanceResult(
     val reasoning: String,
     val chunksUsed: Int,
     val providerUsed: String? = null,
-    val tokensConsumed: Int = 0
+    val tokensConsumed: Int = 0,
+    val didStopEarly: Boolean = false
 ) {
     data class ExcerptAnalysis(
         val chunkId: Int,
@@ -58,14 +59,79 @@ data class SmartStanceResult(
         val topAnalysis = excerptAnalyses.maxByOrNull { it.confidence }
             ?: ExcerptAnalysis(0, overallStance, overallConfidence, reasoning)
         
+        val analyzedChunks = excerptAnalyses.map { analysis ->
+            com.najmi.falco.domain.model.AnalyzedChunk(
+                content = "",
+                sourceSection = "CHUNK_${analysis.chunkId}",
+                estimatedTokens = 0,
+                keyEvidence = analysis.keyEvidence,
+                confidence = analysis.confidence
+            )
+        }
+
+        val confidenceFactors = buildConfidenceFactors(paper, overallConfidence)
+        
         return com.najmi.falco.domain.model.PaperStance(
             paper = paper,
             actorStance = overallStance,
             actorReasoning = reasoning,
             confidence = overallConfidence,
             keyEvidence = topAnalysis.keyEvidence ?: topAnalysis.reasoning,
-            relevanceScore = overallConfidence
+            relevanceScore = overallConfidence,
+            chunksAnalyzed = analyzedChunks,
+            analysisDepth = com.najmi.falco.domain.model.AnalysisDepth.fromChunks(chunksUsed),
+            providerUsed = providerUsed ?: "unknown",
+            didStopEarly = didStopEarly,
+            confidenceFactors = confidenceFactors
         )
+    }
+
+    private fun buildConfidenceFactors(
+        paper: com.najmi.falco.domain.model.Paper,
+        confidence: Float
+    ): List<com.najmi.falco.domain.model.ConfidenceFactor> {
+        val factors = mutableListOf<com.najmi.falco.domain.model.ConfidenceFactor>()
+        
+        if (paper.citationCount > 100) {
+            factors.add(com.najmi.falco.domain.model.ConfidenceFactor(
+                type = "CITATION_COUNT",
+                value = "${paper.citationCount} citations",
+                impact = "positive"
+            ))
+        } else if (paper.citationCount > 0) {
+            factors.add(com.najmi.falco.domain.model.ConfidenceFactor(
+                type = "CITATION_COUNT",
+                value = "${paper.citationCount} citations",
+                impact = "neutral"
+            ))
+        }
+        
+        if (paper.isOpenAccess) {
+            factors.add(com.najmi.falco.domain.model.ConfidenceFactor(
+                type = "OPEN_ACCESS",
+                value = "Open Access",
+                impact = "positive"
+            ))
+        }
+        
+        paper.year?.let { year ->
+            val yearsAgo = 2026 - year
+            factors.add(com.najmi.falco.domain.model.ConfidenceFactor(
+                type = "RECENCY",
+                value = "$year ($yearsAgo years ago)",
+                impact = if (yearsAgo <= 5) "positive" else if (yearsAgo <= 10) "neutral" else "negative"
+            ))
+        }
+        
+        if (confidence >= 0.8f) {
+            factors.add(com.najmi.falco.domain.model.ConfidenceFactor(
+                type = "MODEL_CONFIDENCE",
+                value = "${(confidence * 100).toInt()}%",
+                impact = "positive"
+            ))
+        }
+        
+        return factors
     }
 }
 

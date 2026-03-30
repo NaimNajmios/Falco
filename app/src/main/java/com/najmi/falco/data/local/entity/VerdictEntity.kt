@@ -26,5 +26,7 @@ data class VerdictEntity(
     val totalPapersRetrieved: Int,
     val totalPapersPassedGate: Int,
     val temporalWarning: String?,
-    val completedAt: Long
+    val completedAt: Long,
+    val analysisMetadataJson: String? = null,
+    val uncertaintyInfoJson: String? = null
 )

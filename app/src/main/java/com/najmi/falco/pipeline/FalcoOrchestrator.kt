@@ -11,11 +11,14 @@ import com.najmi.falco.agent.SmartStanceActor
 import com.najmi.falco.agent.SmartStanceActorInput
 import com.najmi.falco.agent.StanceCriticAgent
 import com.najmi.falco.agent.StanceCriticInput
+import com.najmi.falco.chunking.EvidenceChunk
 import com.najmi.falco.data.local.DebugLogger
+import com.najmi.falco.domain.model.AnalysisMetadata
 import com.najmi.falco.domain.model.Claim
 import com.najmi.falco.domain.model.PaperQuality
 import com.najmi.falco.domain.model.PaperStance
 import com.najmi.falco.domain.model.Stance
+import com.najmi.falco.domain.model.UncertaintyInfo
 import com.najmi.falco.domain.model.VerificationStage
 import com.najmi.falco.domain.model.VerificationState
 import com.najmi.falco.domain.repository.IPaperRepository
@@ -74,7 +77,9 @@ class FalcoOrchestrator @Inject constructor(
 
             stageStart = System.currentTimeMillis()
             send(VerificationState.InProgress(VerificationStage.RETRIEVING_PAPERS, "Searching academic databases..."))
-            val papers = paperRepo.searchAll(queries)
+            val searchResult = paperRepo.searchAll(queries)
+            val papers = searchResult.papers
+            val databasesQueried = searchResult.databasesQueried
             DebugLogger.stage("RETRIEVING_PAPERS (${papers.size} papers)", System.currentTimeMillis() - stageStart)
 
             stageStart = System.currentTimeMillis()
@@ -115,6 +120,7 @@ class FalcoOrchestrator @Inject constructor(
             
             val backpressureQueue = PaperBackpressureQueue()
             val actorResults = mutableListOf<Result<PaperStance>>()
+            var totalTokensAnalyzed = 0
             
             launch {
                 analyzedPapers.forEach { qualityPaper ->
@@ -139,16 +145,21 @@ class FalcoOrchestrator @Inject constructor(
                 DebugLogger.w("[PIPELINE] ${actorFailures}/${actorResults.size} stance classifications failed")
             }
             
-            val actorStances: List<PaperStance> = actorResults
-                .mapNotNull { it.getOrNull() }
-                .filter { it.confidence > 0.3f }
+            val actorStancesWithTokens: List<PaperStance> = actorResults.mapNotNull { result ->
+                result.getOrNull()?.let { stance ->
+                    totalTokensAnalyzed += estimateTokensFromChunks(stance)
+                    stance
+                }
+            }
+            
+            val actorStances = actorStancesWithTokens.filter { it.confidence > 0.3f }
             
             if (actorStances.isEmpty()) {
                 send(VerificationState.Error(VerificationStage.ACTOR_CLASSIFICATION, "All paper stance classifications failed. Check your API keys or try again later."))
                 return@channelFlow
             }
             
-            DebugLogger.stage("ACTOR_CLASSIFICATION (${actorStances.size} stances)", System.currentTimeMillis() - stageStart)
+            DebugLogger.stage("ACTOR_CLASSIFICATION (${actorStances.size} stances, ~$totalTokensAnalyzed tokens)", System.currentTimeMillis() - stageStart)
 
             stageStart = System.currentTimeMillis()
             send(VerificationState.InProgress(VerificationStage.CROSS_REFERENCE, "Analyzing cross-paper consensus..."))
@@ -222,7 +233,8 @@ class FalcoOrchestrator @Inject constructor(
                 if (!suggestedQueries.isNullOrEmpty()) {
                     send(VerificationState.InProgress(VerificationStage.ADAPTIVE_RETRIEVAL, "Fetching additional evidence (${adaptiveRetryCount}/${maxAdaptiveRetries})..."))
                     
-                    val additionalPapers = paperRepo.searchAll(suggestedQueries)
+                    val additionalSearchResult = paperRepo.searchAll(suggestedQueries)
+                    val additionalPapers = additionalSearchResult.papers
                     val additionalQualityPapers = paperQualityGate.filter(additionalPapers, claim.type)
                     val additionalAnalyzedPapers = temporalAnalyzer.analyze(additionalQualityPapers, claim.type)
                     
@@ -248,9 +260,14 @@ class FalcoOrchestrator @Inject constructor(
                         
                         additionalProducer.join()
                         
-                        val additionalActorStances = additionalActorResults
-                            .mapNotNull { it.getOrNull() }
-                            .filter { it.confidence > 0.3f }
+                        val additionalActorStancesWithTokens = additionalActorResults.mapNotNull { result ->
+                            result.getOrNull()?.let { stance ->
+                                totalTokensAnalyzed += estimateTokensFromChunks(stance)
+                                stance
+                            }
+                        }
+                        
+                        val additionalActorStances = additionalActorStancesWithTokens.filter { it.confidence > 0.3f }
                         
                         if (additionalActorStances.isNotEmpty()) {
                             val additionalCrossRefResult = crossReferenceAgent.execute(
@@ -272,10 +289,31 @@ class FalcoOrchestrator @Inject constructor(
 
             val verdict = aggregatorOutput!!.verdict
 
-            verdictRepo.save(verdict)
+            val estimatedFullTextTokens = analyzedPapers.sumOf { qualityPaper ->
+                EvidenceChunk.estimateFullTextTokens(qualityPaper.paper.abstract, qualityPaper.paper.year)
+            }
+            
+            val analysisMetadata = AnalysisMetadata(
+                totalTokensAnalyzed = totalTokensAnalyzed,
+                estimatedFullTextTokens = estimatedFullTextTokens,
+                efficiencyComparison = calculateEfficiencyComparison(totalTokensAnalyzed, estimatedFullTextTokens),
+                analysisDurationMs = System.currentTimeMillis() - totalStart,
+                databasesQueried = databasesQueried,
+                algorithmVersion = "Smart Chunking v1.2",
+                completedAt = System.currentTimeMillis()
+            )
+            
+            val uncertaintyInfo = buildUncertaintyInfo(analyzedPapers, temporalWarning)
+            
+            val enhancedVerdict = verdict.copy(
+                analysisMetadata = analysisMetadata,
+                uncertaintyInfo = uncertaintyInfo
+            )
+
+            verdictRepo.save(enhancedVerdict)
             DebugLogger.stage("AGGREGATING (${adaptiveRetryCount} adaptive retries)", System.currentTimeMillis() - stageStart)
             DebugLogger.d("[PIPELINE] Completed in ${System.currentTimeMillis() - totalStart}ms")
-            send(VerificationState.Success(verdict))
+            send(VerificationState.Success(enhancedVerdict))
 
         } catch (e: Exception) {
             DebugLogger.e("[PIPELINE] Failed: ${e.message}")
@@ -289,5 +327,50 @@ class FalcoOrchestrator @Inject constructor(
             is RateLimitException -> "Rate limit exceeded. Please wait a moment and try again."
             else -> error.message ?: "An unexpected error occurred"
         }
+    }
+    
+    private fun estimateTokensFromChunks(stance: PaperStance): Int {
+        return stance.chunksAnalyzed.sumOf { it.estimatedTokens }
+    }
+    
+    private fun calculateEfficiencyComparison(tokensAnalyzed: Int, fullTextTokens: Int): String? {
+        if (fullTextTokens <= 0 || tokensAnalyzed <= 0) return null
+        val savings = ((fullTextTokens - tokensAnalyzed).toFloat() / fullTextTokens * 100).toInt()
+        return if (savings > 0) {
+            "$savings% more efficient than full-text analysis"
+        } else {
+            null
+        }
+    }
+    
+    private fun buildUncertaintyInfo(
+        analyzedPapers: List<com.najmi.falco.domain.model.PaperQuality>,
+        temporalWarning: String?
+    ): UncertaintyInfo {
+        val qualityWarnings = mutableListOf<String>()
+        val gaps = mutableListOf<String>()
+        var recencyAlert: String? = null
+        
+        val years = analyzedPapers.mapNotNull { it.paper.year }
+        if (years.isNotEmpty()) {
+            val mostRecentYear = years.maxOrNull() ?: 0
+            val yearsAgo = 2026 - mostRecentYear
+            if (yearsAgo > 5) {
+                recencyAlert = "Most recent study: $mostRecentYear"
+            }
+        }
+        
+        analyzedPapers.forEach { qualityPaper ->
+            if (qualityPaper.paper.citationCount < 10) {
+                qualityWarnings.add("Low citation count: ${qualityPaper.paper.title.take(40)}...")
+            }
+        }
+        
+        return UncertaintyInfo(
+            gaps = gaps,
+            qualityWarnings = qualityWarnings,
+            recencyAlert = recencyAlert,
+            fundingDisclosure = null
+        )
     }
 }

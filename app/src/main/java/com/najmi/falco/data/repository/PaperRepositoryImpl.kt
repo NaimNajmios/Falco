@@ -6,6 +6,7 @@ import com.najmi.falco.data.remote.semanticscholar.RateLimitException
 import com.najmi.falco.data.remote.semanticscholar.SemanticScholarClient
 import com.najmi.falco.domain.model.Paper
 import com.najmi.falco.domain.repository.IPaperRepository
+import com.najmi.falco.domain.repository.PaperSearchResult
 import com.najmi.falco.pipeline.PaperDeduplicator
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.async
@@ -59,7 +60,9 @@ class PaperRepositoryImpl @Inject constructor(
         return deduplicator.deduplicate(results).take(limit)
     }
 
-    override suspend fun searchAll(queries: List<String>): List<Paper> = coroutineScope {
+    override suspend fun searchAll(queries: List<String>): PaperSearchResult = coroutineScope {
+        val databasesQueried = mutableListOf<String>()
+        
         val ssDeferred = async {
             try {
                 queries.flatMap { query ->
@@ -95,13 +98,22 @@ class PaperRepositoryImpl @Inject constructor(
             }
         }
         
-        val allPapers = ssDeferred.await() + oaDeferred.await()
+        val ssPapers = ssDeferred.await()
+        val oaPapers = oaDeferred.await()
+        
+        if (ssPapers.isNotEmpty()) databasesQueried.add("Semantic Scholar")
+        if (oaPapers.isNotEmpty()) databasesQueried.add("OpenAlex")
+        
+        val allPapers = ssPapers + oaPapers
         
         if (allPapers.isEmpty()) {
             Log.w(TAG, "No papers retrieved from any source for queries: $queries")
         }
         
-        deduplicator.deduplicate(allPapers)
+        PaperSearchResult(
+            papers = deduplicator.deduplicate(allPapers),
+            databasesQueried = databasesQueried
+        )
     }
 
     suspend fun getPapersWithMetadataRefresh(papers: List<Paper>): List<Paper> {
