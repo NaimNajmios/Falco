@@ -102,6 +102,8 @@ fun VerdictDetailScreen(
 
         Spacer(Modifier.height(24.dp))
 
+        Spacer(Modifier.height(24.dp))
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -109,6 +111,8 @@ fun VerdictDetailScreen(
             FalcoMetaRow("LATENCY", "${verdict.analysisMetadata.analysisDurationMs}ms")
             FalcoMetaRow("METADATA", "${verdict.totalPapersPassedGate} passed · ${verdict.totalPapersRetrieved} retrieved")
         }
+
+        Spacer(Modifier.height(16.dp))
 
         verdict.temporalWarning?.let { warning ->
             Spacer(Modifier.height(16.dp))

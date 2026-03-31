@@ -113,12 +113,21 @@ class RoutewayClient @Inject constructor(
         val routewayResponse: RoutewayResponse = try {
             json.decodeFromString<RoutewayResponse>(responseBody)
         } catch (e: Exception) {
-            DebugLogger.e("[ROUTEWAY] Parse error: ${e.message}")
-            throw Exception("Invalid response from Routeway: ${e.message}")
+            val errorMsg = try {
+                json.decodeFromString<RoutewayErrorResponse>(responseBody).error.message
+            } catch (ignored: Exception) {
+                responseBody.take(200)
+            }
+            DebugLogger.e("[ROUTEWAY] Parse error / API error: $errorMsg")
+            throw Exception("Routeway returned an error: $errorMsg")
         }
 
-        val text = routewayResponse.choices.firstOrNull()?.message?.content
-            ?: throw Exception("Empty response from Routeway")
+        if (routewayResponse.choices.isNullOrEmpty()) {
+            DebugLogger.e("[ROUTEWAY] Empty choices in response")
+            throw Exception("Routeway returned an empty response")
+        }
+
+        val text = routewayResponse.choices.first().message.content
 
         val usage = TokenUsage(
             promptTokens = routewayResponse.usage?.promptTokens ?: 0,

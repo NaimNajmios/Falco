@@ -27,18 +27,19 @@ FALCO's core is a dynamic, multi-stage pipeline managed by the `FalcoOrchestrato
 
 ## 🛡 Security & Resilience
 
-FALCO is built for production-grade reliability and data privacy:
-
 -   **Industry-Standard Encryption**: All user API keys are secured using **AES256-GCM/SIV** via `EncryptedSharedPreferences` and Android's `MasterKey` system.
--   **Resilient Tiered Routing**: The `ProviderRouter` implements intelligent fallback logic (**Groq** → **Gemini** → **Cerebras/Mistral/Cohere**), ensuring high availability even during provider outages.
--   **Live Health Monitoring**: Continuous status tracking to optimize for the fastest and most reliable model at any given moment.
+-   **Resilient Tiered Routing**: The `ProviderRouter` implements intelligent fallback logic (**Groq** → **Gemini** → **Others**), ensuring high availability even during provider outages.
 
 ## ✨ Advanced Features
 
--   **Deep Evidence Analytics**: Transparency on tokens analyzed, analysis duration, and efficiency gains vs. traditional full-text processing.
--   **Field-Aware Verification**: Specialized thresholds for different academic domains (AI, Medicine, Social Sciences, etc.).
+-   **Evidence-Backed Search History**: The **Dossier** screen provides a comprehensive view of past verifications, featuring:
+    -   **Stance-Lean Visualization**: Quick-glance indicators for SUPPORTS, OPPOSES, and NEUTRAL stances.
+    -   **Evidence Counts (S/O/N)**: Real-time counts of supporting, opposing, and neutral papers for each record.
+    -   **Confidence Segment Bars**: Visual certainty levels for every historical claim.
+-   **Intelligent Optimization**: Early-stopping stance analysis and incremental chunking for cost-effective verification.
 -   **Persistent Dossier History**: Full CRUD support for past claims, allowing users to browse, re-examine, or delete detailed verification records.
--   **Real-time Diagnostic Logging**: Integrated `DebugLogger` for full transparency into the orchestration process.
+-   **Field-Aware Verification**: Specialized thresholds for different academic domains (AI, Medicine, Social Sciences, etc.).
+-   **Expanded LLM Ecosystem**: Support for **Gemini**, **Groq**, **Cerebras**, **Cohere**, **Mistral**, and **OpenRouter**.
 -   **Premium UI/UX**: Sleek, dark-themed interface built with Jetpack Compose, featuring real-time stage tracking in the `PipelineScreen`.
 
 ## 🛠 Tech Stack
@@ -46,7 +47,6 @@ FALCO is built for production-grade reliability and data privacy:
 -   **Language**: Kotlin
 -   **UI Framework**: Jetpack Compose (Material 3)
 -   **Architecture**: Clean Architecture + MVVM + Agent-Oriented Design
--   **Security**: AndroidX Crypto (MasterKey & EncryptedSharedPreferences)
 -   **Persistence**: Room (Dossier history, Quota tracking, and Claims)
 -   **Remote**: Ktor (Multiplatform-ready HTTP client)
 -   **Background Tasks**: Android WorkManager

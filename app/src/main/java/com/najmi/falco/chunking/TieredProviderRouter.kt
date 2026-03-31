@@ -41,18 +41,19 @@ class TieredProviderRouter @Inject constructor(
 
     fun selectProvider(tokenCount: Int): LlmProvider {
         return when {
-            tokenCount <= GROQ_MAX_TOKENS -> LlmProvider.GROQ
-            tokenCount <= CEREBRAS_MAX_TOKENS -> LlmProvider.CEREBRAS
-            tokenCount <= GEMINI_MAX_TOKENS -> LlmProvider.GEMINI
-            else -> LlmProvider.OPENROUTER
+            tokenCount <= GROQ_MAX_TOKENS -> LlmProvider.ROUTEWAY
+            tokenCount <= CEREBRAS_MAX_TOKENS -> LlmProvider.ROUTEWAY
+            tokenCount <= GEMINI_MAX_TOKENS -> LlmProvider.CEREBRAS
+            else -> LlmProvider.CEREBRAS
         }
     }
 
     fun getProviderOrder(tokenCount: Int): List<LlmProvider> {
         val primary = selectProvider(tokenCount)
         val allProviders = listOf(
-            LlmProvider.GROQ,
+            LlmProvider.ROUTEWAY,
             LlmProvider.CEREBRAS,
+            LlmProvider.GROQ,
             LlmProvider.GEMINI,
             LlmProvider.OPENROUTER
         )

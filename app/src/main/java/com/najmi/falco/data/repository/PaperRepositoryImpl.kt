@@ -10,6 +10,7 @@ import com.najmi.falco.domain.repository.PaperSearchResult
 import com.najmi.falco.pipeline.PaperDeduplicator
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -62,54 +63,53 @@ class PaperRepositoryImpl @Inject constructor(
 
     override suspend fun searchAll(queries: List<String>): PaperSearchResult = coroutineScope {
         val databasesQueried = mutableListOf<String>()
-        
+
         val ssDeferred = async {
-            try {
-                queries.flatMap { query ->
+            val results = mutableListOf<Paper>()
+            for (query in queries) {
+                try {
+                    semanticScholar.searchPapers(query, limit = DEFAULT_LIMIT_PER_QUERY).let { results.addAll(it) }
+                } catch (e: RateLimitException) {
+                    Log.w(TAG, "Semantic Scholar rate limited, backing off for query: $query")
+                    delay(5000L)
                     try {
-                        semanticScholar.searchPapers(query, limit = DEFAULT_LIMIT_PER_QUERY)
-                    } catch (e: RateLimitException) {
-                        Log.w(TAG, "Semantic Scholar rate limited for query: $query")
-                        emptyList()
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Semantic Scholar failed for query '$query': ${e.message}")
-                        emptyList()
+                        semanticScholar.searchPapers(query, limit = DEFAULT_LIMIT_PER_QUERY).let { results.addAll(it) }
+                    } catch (e2: Exception) {
+                        Log.w(TAG, "Semantic Scholar retry failed for '$query': ${e2.message}")
                     }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Semantic Scholar failed for '$query': ${e.message}")
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Semantic Scholar batch failed: ${e.message}")
-                emptyList()
+                delay(1500L)
             }
+            results
         }
-        
+
         val oaDeferred = async {
-            try {
-                queries.flatMap { query ->
-                    try {
-                        openAlex.searchPapers(query, limit = DEFAULT_LIMIT_PER_QUERY)
-                    } catch (e: Exception) {
-                        Log.w(TAG, "OpenAlex failed for query '$query': ${e.message}")
-                        emptyList()
-                    }
+            val results = mutableListOf<Paper>()
+            for (query in queries) {
+                try {
+                    openAlex.searchPapers(query, limit = DEFAULT_LIMIT_PER_QUERY).let { results.addAll(it) }
+                } catch (e: Exception) {
+                    Log.w(TAG, "OpenAlex failed for '$query': ${e.message}")
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "OpenAlex batch failed: ${e.message}")
-                emptyList()
+                delay(500L)
             }
+            results
         }
-        
+
         val ssPapers = ssDeferred.await()
         val oaPapers = oaDeferred.await()
-        
+
         if (ssPapers.isNotEmpty()) databasesQueried.add("Semantic Scholar")
         if (oaPapers.isNotEmpty()) databasesQueried.add("OpenAlex")
-        
+
         val allPapers = ssPapers + oaPapers
-        
+
         if (allPapers.isEmpty()) {
             Log.w(TAG, "No papers retrieved from any source for queries: $queries")
         }
-        
+
         PaperSearchResult(
             papers = deduplicator.deduplicate(allPapers),
             databasesQueried = databasesQueried
