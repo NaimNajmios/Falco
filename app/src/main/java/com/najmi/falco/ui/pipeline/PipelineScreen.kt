@@ -40,6 +40,7 @@ import com.najmi.falco.domain.model.Stance
 import com.najmi.falco.domain.model.VerificationState
 import com.najmi.falco.domain.model.VerificationStage
 import com.najmi.falco.ui.hypothesis.HypothesisViewModel
+import com.najmi.falco.ui.components.ConfidenceSegmentBar
 import com.najmi.falco.ui.theme.LocalFalcoPalette
 import com.najmi.falco.ui.theme.FalcoDimens
 import com.najmi.falco.ui.theme.FalcoTypography
@@ -50,7 +51,8 @@ import kotlin.random.Random
 @Composable
 fun PipelineScreen(
     hypothesisViewModel: HypothesisViewModel,
-    onNewClaim: () -> Unit
+    onNewClaim: () -> Unit,
+    onCancel: () -> Unit
 ) {
     val state by hypothesisViewModel.verificationState.collectAsState()
     val claimText by hypothesisViewModel.claimText.collectAsState()
@@ -64,11 +66,30 @@ fun PipelineScreen(
     ) {
         Spacer(Modifier.height(48.dp))
 
-        Text(
-            claimText.take(30).let { if (claimText.length > 30) "$it..." else it },
-            style = FalcoTypography.headlineLarge,
-            color = LocalFalcoPalette.current.textPrimary
-        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    4.dp,
+                    LocalFalcoPalette.current.divider,
+                    FalcoZeroShape
+                )
+                .padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 12.dp)
+        ) {
+            Column {
+                Text(
+                    claimText,
+                    style = FalcoTypography.headlineLarge,
+                    color = LocalFalcoPalette.current.textPrimary
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "SOURCE_ID: ${hypothesisViewModel.currentClaimId}",
+                    style = FalcoTypography.labelSmall,
+                    color = LocalFalcoPalette.current.textGhost
+                )
+            }
+        }
 
         Spacer(Modifier.height(24.dp))
 
@@ -91,6 +112,10 @@ fun PipelineScreen(
                 LiveMonitor()
 
                 Spacer(Modifier.height(32.dp))
+
+                FalcoGhostButton("HALT_PROCESS", onClick = onCancel)
+
+                Spacer(Modifier.height(80.dp))
             }
         }
     }
@@ -106,6 +131,7 @@ private fun VerdictResult(
         Stance.SUPPORTS -> LocalFalcoPalette.current.stanceSupports
         Stance.NEUTRAL -> LocalFalcoPalette.current.stanceNeutral
         Stance.OPPOSES -> LocalFalcoPalette.current.stanceOpposes
+        Stance.INSUFFICIENT_EVIDENCE -> LocalFalcoPalette.current.textMuted
     }
     val confidencePct = (verdict.confidence * 100).roundToInt()
 
@@ -122,6 +148,23 @@ private fun VerdictResult(
 
     Spacer(Modifier.height(16.dp))
 
+    verdict.analysisMetadata?.let { metadata ->
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                "LATENCY: ${metadata.analysisDurationMs}ms",
+                style = FalcoTypography.labelSmall,
+                color = LocalFalcoPalette.current.textGhost
+            )
+            Spacer(Modifier.width(16.dp))
+            Text(
+                "AUTH: ${verdict.claimId.take(8).uppercase()}",
+                style = FalcoTypography.labelSmall,
+                color = LocalFalcoPalette.current.textGhost
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -133,6 +176,10 @@ private fun VerdictResult(
             Text("SUMMARY", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
             Spacer(Modifier.height(8.dp))
             Text(verdict.summary, style = FalcoTypography.bodySmall, color = LocalFalcoPalette.current.textBody)
+            verdict.caveat?.let { caveat ->
+                Spacer(Modifier.height(8.dp))
+                Text(caveat, style = FalcoTypography.bodySmall, color = LocalFalcoPalette.current.textMuted)
+            }
         }
     }
 
@@ -160,8 +207,17 @@ private fun VerdictResult(
         }
     }
 
-    Spacer(Modifier.height(32.dp))
-    RealTimeExtractionPanel(state = state)
+    Spacer(Modifier.height(24.dp))
+
+    Text("EVIDENCE LIST [${verdict.stances.size}]", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
+    Spacer(Modifier.height(16.dp))
+
+    verdict.stances.sortedByDescending { it.paper.citationCount }.forEach { stance ->
+        EvidenceRow(stance = stance)
+        Spacer(Modifier.height(1.dp))
+        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(LocalFalcoPalette.current.divider))
+        Spacer(Modifier.height(1.dp))
+    }
 
     Spacer(Modifier.height(32.dp))
 
@@ -202,24 +258,6 @@ private fun MetaChip(label: String, value: String) {
         Text(label, style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
         Spacer(Modifier.height(4.dp))
         Text(value, style = FalcoTypography.bodySmall.copy(fontWeight = FontWeight.Medium), color = LocalFalcoPalette.current.textBody)
-    }
-}
-
-@Composable
-private fun ConfidenceSegmentBar(confidence: Float, segments: Int = 13) {
-    val filled = (confidence * segments).roundToInt()
-    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        repeat(segments) { i ->
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(3.dp)
-                    .background(
-                        if (i < filled) LocalFalcoPalette.current.barFilled else LocalFalcoPalette.current.barEmpty,
-                        FalcoZeroShape
-                    )
-            )
-        }
     }
 }
 
@@ -333,22 +371,11 @@ private fun RealTimeExtractionPanel(state: VerificationState) {
             Text("REAL-TIME_EXTRACTION", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
             Spacer(Modifier.height(12.dp))
 
-            if (state is VerificationState.Success) {
-                state.verdict.stances.take(5).forEach { stance ->
-                    Text(
-                        "REF: ${stance.paper.title.take(50)}",
-                        style = FalcoTypography.bodySmall,
-                        color = LocalFalcoPalette.current.textMuted
-                    )
-                    Spacer(Modifier.height(4.dp))
-                }
-            } else {
-                Text(
-                    message ?: "Awaiting input...",
-                    style = FalcoTypography.bodySmall,
-                    color = if (state is VerificationState.Error) LocalFalcoPalette.current.textMuted else LocalFalcoPalette.current.textBody
-                )
-            }
+            Text(
+                message ?: "Awaiting input...",
+                style = FalcoTypography.bodySmall,
+                color = if (state is VerificationState.Error) LocalFalcoPalette.current.textMuted else LocalFalcoPalette.current.textBody
+            )
         }
     }
 }
@@ -458,5 +485,76 @@ private fun FalcoGhostButton(label: String, onClick: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         Text(label, style = FalcoTypography.bodySmall, color = LocalFalcoPalette.current.textPrimary)
+    }
+}
+
+@Composable
+private fun EvidenceRow(stance: com.najmi.falco.domain.model.PaperStance) {
+    var expanded by remember { mutableStateOf(false) }
+    val finalStance = stance.finalStance ?: stance.actorStance
+    val stanceTextColor = when (finalStance) {
+        Stance.SUPPORTS -> LocalFalcoPalette.current.stanceSupports
+        Stance.NEUTRAL -> LocalFalcoPalette.current.stanceNeutral
+        Stance.OPPOSES -> LocalFalcoPalette.current.stanceOpposes
+        Stance.INSUFFICIENT_EVIDENCE -> LocalFalcoPalette.current.textMuted
+    }
+    val groundingScore = stance.groundingScore ?: stance.confidence
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded }
+            .padding(vertical = 12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("[${finalStance.name}]", style = FalcoTypography.labelSmall, color = stanceTextColor)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                stance.paper.title.uppercase().take(50),
+                style = FalcoTypography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                color = LocalFalcoPalette.current.textPrimary
+            )
+            Spacer(Modifier.weight(1f))
+            Text("→", style = FalcoTypography.bodySmall, color = LocalFalcoPalette.current.textGhost)
+        }
+        Spacer(Modifier.height(4.dp))
+        Row {
+            Spacer(Modifier.width(24.dp))
+            Text(
+                "${stance.paper.authors.firstOrNull() ?: "Unknown"}, (${stance.paper.year ?: "N/A"}) · ${stance.paper.citationCount} citations",
+                style = FalcoTypography.labelMedium,
+                color = LocalFalcoPalette.current.textMuted
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Spacer(Modifier.width(24.dp))
+            Text("GROUNDING", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                String.format("%.2f", groundingScore),
+                style = FalcoTypography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                color = LocalFalcoPalette.current.textBody
+            )
+        }
+
+        if (expanded) {
+            Spacer(Modifier.height(8.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp)
+                    .background(LocalFalcoPalette.current.surface)
+                    .padding(12.dp)
+            ) {
+                Column {
+                    Text("ACTOR: ${stance.actorReasoning}", style = FalcoTypography.bodySmall, color = LocalFalcoPalette.current.textMuted)
+                    stance.criticChallenge?.let { challenge ->
+                        Spacer(Modifier.height(8.dp))
+                        Text("CRITIC: $challenge", style = FalcoTypography.bodySmall, color = LocalFalcoPalette.current.textGhost)
+                    }
+                }
+            }
+        }
     }
 }

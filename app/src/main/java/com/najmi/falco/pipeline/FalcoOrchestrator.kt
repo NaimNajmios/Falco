@@ -65,22 +65,22 @@ class FalcoOrchestrator @Inject constructor(
             DebugLogger.stage("CLASSIFYING", System.currentTimeMillis() - stageStart)
 
             stageStart = System.currentTimeMillis()
-            send(VerificationState.InProgress(VerificationStage.EXPANDING_QUERIES, "Generating academic search queries..."))
+            send(VerificationState.InProgress(VerificationStage.EXPANDING, "Generating academic search queries..."))
             
             val queriesResult = queryExpander.execute(claim)
             val queries = queriesResult.getOrElse { e ->
                 DebugLogger.e("[PIPELINE] Query expansion failed: ${e.message}")
-                send(VerificationState.Error(VerificationStage.EXPANDING_QUERIES, "Failed to generate queries: ${getUserFriendlyError(e)}"))
+                send(VerificationState.Error(VerificationStage.EXPANDING, "Failed to generate queries: ${getUserFriendlyError(e)}"))
                 return@channelFlow
             }
-            DebugLogger.stage("EXPANDING_QUERIES", System.currentTimeMillis() - stageStart)
+            DebugLogger.stage("EXPANDING", System.currentTimeMillis() - stageStart)
 
             stageStart = System.currentTimeMillis()
-            send(VerificationState.InProgress(VerificationStage.RETRIEVING_PAPERS, "Searching academic databases..."))
+            send(VerificationState.InProgress(VerificationStage.RETRIEVING, "Searching academic databases..."))
             val searchResult = paperRepo.searchAll(queries)
             val papers = searchResult.papers
             val databasesQueried = searchResult.databasesQueried
-            DebugLogger.stage("RETRIEVING_PAPERS (${papers.size} papers)", System.currentTimeMillis() - stageStart)
+            DebugLogger.stage("RETRIEVING (${papers.size} papers)", System.currentTimeMillis() - stageStart)
 
             stageStart = System.currentTimeMillis()
             send(VerificationState.InProgress(VerificationStage.QUALITY_GATING, "Filtering papers by quality..."))
@@ -97,7 +97,7 @@ class FalcoOrchestrator @Inject constructor(
                 val emptyVerdict = com.najmi.falco.domain.model.Verdict(
                     claimId = claim.id,
                     claim = claim.text,
-                    lean = Stance.NEUTRAL,
+                    lean = Stance.INSUFFICIENT_EVIDENCE,
                     confidence = 0f,
                     summary = "No papers passed the quality gate. Unable to verify this claim.",
                     stances = emptyList(),
@@ -107,7 +107,8 @@ class FalcoOrchestrator @Inject constructor(
                     opposingCount = 0,
                     neutralCount = 0,
                     dominantField = "Unknown",
-                    temporalWarning = null
+                    temporalWarning = null,
+                    caveat = "No papers passed the quality gate. No evidence available to verify this claim."
                 )
                 verdictRepo.save(emptyVerdict)
                 send(VerificationState.Success(emptyVerdict))
@@ -162,13 +163,13 @@ class FalcoOrchestrator @Inject constructor(
             DebugLogger.stage("ACTOR_CLASSIFICATION (${actorStances.size} stances, ~$totalTokensAnalyzed tokens)", System.currentTimeMillis() - stageStart)
 
             stageStart = System.currentTimeMillis()
-            send(VerificationState.InProgress(VerificationStage.CROSS_REFERENCE, "Analyzing cross-paper consensus..."))
+            send(VerificationState.InProgress(VerificationStage.ACTOR_CLASSIFICATION, "Classifying stances and analyzing consensus..."))
             
             val crossRefResult = crossReferenceAgent.execute(
                 CrossReferenceInput(claim.text, actorStances)
             )
             val enrichedStances = crossRefResult.getOrNull()?.enrichedStances ?: actorStances
-            DebugLogger.stage("CROSS_REFERENCE (${enrichedStances.count { it.isConsensus }} consensus, ${enrichedStances.count { it.isOutlier }} outliers)", System.currentTimeMillis() - stageStart)
+            DebugLogger.stage("ACTOR_CLASSIFICATION + CROSS_REFERENCE (${enrichedStances.count { it.isConsensus }} consensus, ${enrichedStances.count { it.isOutlier }} outliers)", System.currentTimeMillis() - stageStart)
 
             stageStart = System.currentTimeMillis()
             send(VerificationState.InProgress(VerificationStage.CRITIC_REVIEW, "Critic reviewing stances..."))
@@ -231,7 +232,7 @@ class FalcoOrchestrator @Inject constructor(
                 DebugLogger.d("[PIPELINE] Adaptive retrieval: ${suggestedQueries?.size ?: 0} new queries, retry $adaptiveRetryCount/$maxAdaptiveRetries")
                 
                 if (!suggestedQueries.isNullOrEmpty()) {
-                    send(VerificationState.InProgress(VerificationStage.ADAPTIVE_RETRIEVAL, "Fetching additional evidence (${adaptiveRetryCount}/${maxAdaptiveRetries})..."))
+                    DebugLogger.d("[PIPELINE] Adaptive retrieval: fetching additional evidence (${adaptiveRetryCount}/${maxAdaptiveRetries})")
                     
                     val additionalSearchResult = paperRepo.searchAll(suggestedQueries)
                     val additionalPapers = additionalSearchResult.papers
@@ -299,7 +300,7 @@ class FalcoOrchestrator @Inject constructor(
                 efficiencyComparison = calculateEfficiencyComparison(totalTokensAnalyzed, estimatedFullTextTokens),
                 analysisDurationMs = System.currentTimeMillis() - totalStart,
                 databasesQueried = databasesQueried,
-                algorithmVersion = "Smart Chunking v1.2",
+                algorithmVersion = "v1.0",
                 completedAt = System.currentTimeMillis()
             )
             

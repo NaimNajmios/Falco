@@ -15,7 +15,8 @@ class TokenSteward @Inject constructor(
         LlmProvider.CEREBRAS to 1_000_000,
         LlmProvider.OPENROUTER to 50_000,
         LlmProvider.MISTRAL to 100_000,
-        LlmProvider.COHERE to 100_000
+        LlmProvider.COHERE to 100_000,
+        LlmProvider.ROUTEWAY to 0
     )
 
     suspend fun recordUsage(provider: LlmProvider, tokensUsed: Int) {
@@ -55,6 +56,7 @@ class TokenSteward @Inject constructor(
             LlmProvider.OPENROUTER -> 5000
             LlmProvider.MISTRAL -> 5000
             LlmProvider.COHERE -> 5000
+            LlmProvider.ROUTEWAY -> 180
         }
     }
 

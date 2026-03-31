@@ -78,6 +78,11 @@ class FreeTierQuotaManager @Inject constructor(
                 dailyRequests = 500,
                 rpm = 10,
                 dailyTokens = 100_000
+            ),
+            LlmProvider.ROUTEWAY to ProviderLimits(
+                dailyRequests = 180,
+                rpm = 15,
+                dailyTokens = 0
             )
         )
 
@@ -292,7 +297,8 @@ class FreeTierQuotaManager @Inject constructor(
             LlmProvider.GEMINI,
             LlmProvider.OPENROUTER,
             LlmProvider.MISTRAL,
-            LlmProvider.COHERE
+            LlmProvider.COHERE,
+            LlmProvider.ROUTEWAY
         )
 
         return orderedProviders.firstOrNull { provider ->

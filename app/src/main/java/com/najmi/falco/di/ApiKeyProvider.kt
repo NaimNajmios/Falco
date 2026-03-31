@@ -20,6 +20,7 @@ class ApiKeyProvider @Inject constructor(
             LlmProvider.COHERE -> prefs.userCohereKey
             LlmProvider.CEREBRAS -> prefs.userCerebrasKey
             LlmProvider.OPENROUTER -> prefs.userOpenRouterKey
+            LlmProvider.ROUTEWAY -> prefs.userRoutewayKey
         }
         
         return userKey ?: throw IllegalStateException("No API key configured for ${provider.name}. Please add your key in Settings.")

@@ -60,6 +60,7 @@ class UserPreferencesRepository @Inject constructor(
             userCohereKey = getEncryptedKey("user_cohere_key"),
             userCerebrasKey = getEncryptedKey("user_cerebras_key"),
             userOpenRouterKey = getEncryptedKey("user_openrouter_key"),
+            userRoutewayKey = getEncryptedKey("user_routeway_key"),
             enableSmartChunking = prefs[SMART_CHUNKING_KEY] ?: false,
             maxPapersToAnalyze = prefs[MAX_PAPERS_KEY] ?: 10,
             earlyStopConfidence = prefs[EARLY_STOP_CONFIDENCE_KEY] ?: 0.85f
@@ -99,6 +100,7 @@ class UserPreferencesRepository @Inject constructor(
             LlmProvider.COHERE -> "user_cohere_key"
             LlmProvider.CEREBRAS -> "user_cerebras_key"
             LlmProvider.OPENROUTER -> "user_openrouter_key"
+            LlmProvider.ROUTEWAY -> "user_routeway_key"
         }
         setEncryptedKey(keyName, key)
         context.dataStore.edit { it[Keys.KEYS_REVISION] = System.currentTimeMillis() }
@@ -112,6 +114,7 @@ class UserPreferencesRepository @Inject constructor(
             LlmProvider.COHERE -> getEncryptedKey("user_cohere_key")
             LlmProvider.CEREBRAS -> getEncryptedKey("user_cerebras_key")
             LlmProvider.OPENROUTER -> getEncryptedKey("user_openrouter_key")
+            LlmProvider.ROUTEWAY -> getEncryptedKey("user_routeway_key")
         }
     }
 
@@ -122,6 +125,7 @@ class UserPreferencesRepository @Inject constructor(
         setEncryptedKey("user_cohere_key", null)
         setEncryptedKey("user_cerebras_key", null)
         setEncryptedKey("user_openrouter_key", null)
+        setEncryptedKey("user_routeway_key", null)
         context.dataStore.edit { it[Keys.KEYS_REVISION] = System.currentTimeMillis() }
     }
 

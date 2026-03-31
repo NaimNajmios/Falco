@@ -23,8 +23,8 @@ class TieredProviderRouter @Inject constructor(
         private const val GEMINI_MAX_TOKENS = 128000
         
         private const val MAX_RETRIES = 2
-        private const val RETRY_DELAY_MS = 500L
-        private const val FALLBACK_TIMEOUT_MS = 500L
+        private const val RETRY_DELAY_MS = 2000L
+        private const val FALLBACK_TIMEOUT_MS = 3000L
     }
 
     data class RouteResult(
@@ -94,8 +94,8 @@ class TieredProviderRouter @Inject constructor(
             val error = result.exceptionOrNull()
             Log.w(TAG, "Provider ${provider.name} failed: ${error?.message}")
 
-            if (isRateLimitError(error)) {
-                quotaManager.markExhausted(provider, error?.message ?: "Rate limit")
+            if (isProviderExhaustedError(error)) {
+                quotaManager.markExhausted(provider, error?.message ?: "Provider exhausted")
                 continue
             }
 
@@ -138,16 +138,19 @@ class TieredProviderRouter @Inject constructor(
         }
 
         Log.w(TAG, "Primary ${primary.name} failed, trying Cerebras directly")
+        val cerebrasQuota = quotaManager.hasQuota(LlmProvider.CEREBRAS)
+        if (!cerebrasQuota.available) {
+            Log.w(TAG, "Cerebras quota exhausted, skipping fast fallback")
+            return routeFor(prompt, tokenCount)
+        }
+
         val cerebrasResult = tryProviderWithRetry(LlmProvider.CEREBRAS, prompt, 1)
         if (cerebrasResult.isSuccess) {
-            val quota = quotaManager.hasQuota(LlmProvider.CEREBRAS)
-            if (quota.available) {
-                return Result.success(RouteResult(
-                    provider = LlmProvider.CEREBRAS,
-                    response = cerebrasResult.getOrThrow(),
-                    usedFallback = true
-                ))
-            }
+            return Result.success(RouteResult(
+                provider = LlmProvider.CEREBRAS,
+                response = cerebrasResult.getOrThrow(),
+                usedFallback = true
+            ))
         }
 
         Log.w(TAG, "Cerebras also failed, trying all providers")
@@ -178,8 +181,8 @@ class TieredProviderRouter @Inject constructor(
             if (result.isSuccess) return result
 
             val error = result.exceptionOrNull()
-            if (isRateLimitError(error)) {
-                quotaManager.markExhausted(provider, error?.message ?: "Rate limit")
+            if (isProviderExhaustedError(error)) {
+                quotaManager.markExhausted(provider, error?.message ?: "Provider exhausted")
                 return result
             }
 
@@ -190,12 +193,17 @@ class TieredProviderRouter @Inject constructor(
         return tryProvider(provider, prompt)
     }
 
-    private fun isRateLimitError(error: Throwable?): Boolean {
+    private fun isProviderExhaustedError(error: Throwable?): Boolean {
         if (error == null) return false
         val message = error.message ?: ""
         return message.contains("429", ignoreCase = true) ||
                 message.contains("rate limit", ignoreCase = true) ||
-                message.contains("Too Many Requests", ignoreCase = true)
+                message.contains("Too Many Requests", ignoreCase = true) ||
+                message.contains("402", ignoreCase = true) ||
+                message.contains("404", ignoreCase = true) ||
+                message.contains("does not exist", ignoreCase = true) ||
+                message.contains("Insufficient credits", ignoreCase = true) ||
+                message.contains("Insufficient balance", ignoreCase = true)
     }
 
     fun getProviderTier(provider: LlmProvider): String {

@@ -88,6 +88,7 @@ class SettingsViewModel @Inject constructor(
             LlmProvider.OPENROUTER -> _uiState.value.preferences.userOpenRouterKey ?: ""
             LlmProvider.MISTRAL -> _uiState.value.preferences.userMistralKey ?: ""
             LlmProvider.COHERE -> _uiState.value.preferences.userCohereKey ?: ""
+            LlmProvider.ROUTEWAY -> _uiState.value.preferences.userRoutewayKey ?: ""
         }
     }
 
@@ -99,6 +100,7 @@ class SettingsViewModel @Inject constructor(
             LlmProvider.OPENROUTER -> !_uiState.value.preferences.userOpenRouterKey.isNullOrBlank()
             LlmProvider.MISTRAL -> !_uiState.value.preferences.userMistralKey.isNullOrBlank()
             LlmProvider.COHERE -> !_uiState.value.preferences.userCohereKey.isNullOrBlank()
+            LlmProvider.ROUTEWAY -> !_uiState.value.preferences.userRoutewayKey.isNullOrBlank()
         }
     }
 

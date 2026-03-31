@@ -9,7 +9,7 @@ data class AnalysisMetadata(
     val efficiencyComparison: String? = null,
     val analysisDurationMs: Long = 0,
     val databasesQueried: List<String> = emptyList(),
-    val algorithmVersion: String = "Smart Chunking v1.2",
+    val algorithmVersion: String = "v1.0",
     val completedAt: Long = System.currentTimeMillis()
 ) {
     fun calculateEfficiency(): String? {

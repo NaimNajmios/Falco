@@ -6,6 +6,7 @@ import com.najmi.falco.data.local.DebugLogger
 import com.najmi.falco.data.remote.LlmProvider
 import com.najmi.falco.domain.model.Paper
 import com.najmi.falco.domain.model.PaperStance
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -164,6 +165,9 @@ class SmartStanceActor @Inject constructor(
             }
             
             index++
+            if (index < sortedChunks.size) {
+                delay(2000L)
+            }
         }
 
         val elapsed = System.currentTimeMillis() - startTime

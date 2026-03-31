@@ -5,12 +5,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -24,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -63,49 +66,114 @@ private fun FalcoApp() {
     val hypothesisViewModel: HypothesisViewModel = hiltViewModel()
     val dossierViewModel: DossierViewModel = hiltViewModel()
     val dossierState by dossierViewModel.uiState.collectAsState()
+    val context = LocalContext.current
 
     var selectedTab by remember {
         mutableStateOf(FalcoTab.Hypothesis)
     }
+
+    var showSettings by remember { mutableStateOf(false) }
 
     val enabledTabs = setOf(FalcoTab.Hypothesis, FalcoTab.Pipeline, FalcoTab.Dossier, FalcoTab.Settings)
 
     Column(modifier = Modifier.fillMaxSize().background(LocalFalcoPalette.current.bg)) {
         FalcoHeader(modifier = Modifier.statusBarsPadding())
         Box(modifier = Modifier.weight(1f).fillMaxSize()) {
-            when (selectedTab) {
-                FalcoTab.Hypothesis -> {
-                    HypothesisScreen(
-                        viewModel = hypothesisViewModel,
-                        onNavigateToPipeline = { selectedTab = FalcoTab.Pipeline }
-                    )
+            if (showSettings) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(LocalFalcoPalette.current.bg)
+                ) {
+                    Spacer(modifier = Modifier.height(48.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("SETTINGS", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
+                        Text("← BACK", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textMuted, modifier = Modifier.clickable { showSettings = false })
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Box(modifier = Modifier.weight(1f)) {
+                        com.najmi.falco.ui.settings.SettingsScreen()
+                    }
                 }
-                FalcoTab.Pipeline -> {
-                    PipelineScreen(
-                        hypothesisViewModel = hypothesisViewModel,
-                        onNewClaim = {
-                            hypothesisViewModel.reset()
-                            selectedTab = FalcoTab.Hypothesis
-                        }
-                    )
-                }
-                FalcoTab.Dossier -> {
-                    if (dossierState.selectedVerdict != null) {
-                        VerdictDetailScreen(
-                            verdict = dossierState.selectedVerdict!!,
-                            onBack = { dossierViewModel.clearSelection() }
+            } else {
+                when (selectedTab) {
+                    FalcoTab.Hypothesis -> {
+                        HypothesisScreen(
+                            viewModel = hypothesisViewModel,
+                            onNavigateToPipeline = { selectedTab = FalcoTab.Pipeline },
+                            onNavigateToSettings = { showSettings = true }
                         )
-                    } else {
-                        DossierScreen(
-                            viewModel = dossierViewModel,
-                            onVerdictSelected = { claimId ->
-                                dossierViewModel.selectVerdict(claimId)
+                    }
+                    FalcoTab.Pipeline -> {
+                        PipelineScreen(
+                            hypothesisViewModel = hypothesisViewModel,
+                            onNewClaim = {
+                                hypothesisViewModel.reset()
+                                selectedTab = FalcoTab.Hypothesis
+                            },
+                            onCancel = {
+                                hypothesisViewModel.cancelVerification()
+                                selectedTab = FalcoTab.Hypothesis
                             }
                         )
                     }
-                }
-                FalcoTab.Settings -> {
-                    SettingsScreen()
+                    FalcoTab.Dossier -> {
+                        if (dossierState.selectedVerdict != null) {
+                            val verdict = dossierState.selectedVerdict!!
+                            VerdictDetailScreen(
+                                verdict = verdict,
+                                onBack = { dossierViewModel.clearSelection() },
+                                onShare = {
+                                    val shareText = buildString {
+                                        appendLine("FALCO Verdict")
+                                        appendLine("═".repeat(30))
+                                        appendLine("Claim: ${verdict.claim}")
+                                        appendLine()
+                                        appendLine("VERDICT: ${verdict.lean.name}")
+                                        appendLine("Confidence: ${(verdict.confidence * 100).toInt()}%")
+                                        appendLine()
+                                        appendLine("Summary: ${verdict.summary}")
+                                        appendLine()
+                                        appendLine("Evidence: ${verdict.stances.size} papers")
+                                        appendLine("  - Supporting: ${verdict.supportingCount}")
+                                        appendLine("  - Opposing: ${verdict.opposingCount}")
+                                        appendLine("  - Neutral: ${verdict.neutralCount}")
+                                        if (verdict.caveat != null) {
+                                            appendLine()
+                                            appendLine("Caveat: ${verdict.caveat}")
+                                        }
+                                        appendLine()
+                                        appendLine("Source ID: ${verdict.claimId}")
+                                    }
+                                    val sendIntent = android.content.Intent().apply {
+                                        action = android.content.Intent.ACTION_SEND
+                                        putExtra(android.content.Intent.EXTRA_TEXT, shareText)
+                                        type = "text/plain"
+                                    }
+                                    val shareIntent = android.content.Intent.createChooser(sendIntent, "Share Verdict")
+                                    context.startActivity(shareIntent)
+                                },
+                                onSave = {
+                                    dossierViewModel.clearSelection()
+                                    selectedTab = FalcoTab.Dossier
+                                }
+                            )
+                        } else {
+                            DossierScreen(
+                                viewModel = dossierViewModel,
+                                onVerdictSelected = { claimId ->
+                                    dossierViewModel.selectVerdict(claimId)
+                                }
+                            )
+                        }
+                    }
+                    FalcoTab.Settings -> {
+                        SettingsScreen()
+                    }
                 }
             }
         }

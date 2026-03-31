@@ -25,34 +25,32 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.najmi.falco.domain.model.AnalysisDepth
 import com.najmi.falco.domain.model.PaperStance
 import com.najmi.falco.domain.model.Stance
 import com.najmi.falco.domain.model.Verdict
-import com.najmi.falco.ui.components.AnalysisDepthMeter
 import com.najmi.falco.ui.components.ChunksExplorer
 import com.najmi.falco.ui.components.ConfidenceFactorsTooltips
-import com.najmi.falco.ui.components.ConfidenceGauge
-import com.najmi.falco.ui.components.ConsensusIndicator
+import com.najmi.falco.ui.components.ConfidenceSegmentBar
+import com.najmi.falco.ui.components.FalcoMetaRow
 import com.najmi.falco.ui.components.ProvenanceFooter
-import com.najmi.falco.ui.components.TokenUsageCard
 import com.najmi.falco.ui.components.UncertaintySection
 import com.najmi.falco.ui.theme.LocalFalcoPalette
-import com.najmi.falco.ui.theme.FalcoDimens
 import com.najmi.falco.ui.theme.FalcoTypography
 import com.najmi.falco.ui.theme.FalcoZeroShape
-import kotlin.math.roundToInt
 
 @Composable
 fun VerdictDetailScreen(
     verdict: Verdict,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onShare: () -> Unit = {},
+    onSave: () -> Unit = {}
 ) {
     val palette = LocalFalcoPalette.current
     val stanceColor = when (verdict.lean) {
         Stance.SUPPORTS -> palette.stanceSupports
         Stance.NEUTRAL -> palette.stanceNeutral
         Stance.OPPOSES -> palette.stanceOpposes
+        Stance.INSUFFICIENT_EVIDENCE -> palette.textMuted
     }
 
     Column(
@@ -64,23 +62,11 @@ fun VerdictDetailScreen(
     ) {
         Spacer(Modifier.height(48.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                "VERDICT",
-                style = FalcoTypography.labelSmall,
-                color = palette.textGhost
-            )
-            Text(
-                "← BACK",
-                style = FalcoTypography.labelSmall,
-                color = palette.textMuted,
-                modifier = Modifier.clickable { onBack() }
-            )
-        }
+        Text(
+            "VERDICT",
+            style = FalcoTypography.labelSmall,
+            color = palette.textGhost
+        )
 
         Spacer(Modifier.height(8.dp))
 
@@ -88,35 +74,40 @@ fun VerdictDetailScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        ConfidenceGauge(
-            confidence = verdict.confidence,
-            certaintyLevel = verdict.certaintyLevel
-        )
-
-        Spacer(Modifier.height(8.dp))
+        if (verdict.lean == Stance.INSUFFICIENT_EVIDENCE) {
+            verdict.caveat?.let { caveat ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(palette.surface)
+                        .border(1.dp, palette.divider, FalcoZeroShape)
+                        .padding(16.dp)
+                ) {
+                    Text(caveat, style = FalcoTypography.bodySmall, color = palette.textMuted)
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        } else {
+            ConfidenceSegmentBar(confidence = verdict.confidence)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "${(verdict.confidence * 100).toInt()}% CONFIDENCE",
+                style = FalcoTypography.labelSmall,
+                color = palette.textMuted
+            )
+            Spacer(Modifier.height(8.dp))
+        }
 
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(palette.divider))
 
         Spacer(Modifier.height(24.dp))
 
-        TokenUsageCard(metadata = verdict.analysisMetadata)
-
-        Spacer(Modifier.height(16.dp))
-
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-        AnalysisDepthMeter(
-            depth = verdict.stances.firstOrNull()?.analysisDepth
-                ?: AnalysisDepth.STANDARD,
-                    chunksAnalyzed = verdict.stances.sumOf { it.chunksAnalyzed.size }
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                ConsensusIndicator(consensusInfo = verdict.consensusInfo)
-            }
+            FalcoMetaRow("LATENCY", "${verdict.analysisMetadata.analysisDurationMs}ms")
+            FalcoMetaRow("METADATA", "${verdict.totalPapersPassedGate} passed · ${verdict.totalPapersRetrieved} retrieved")
         }
 
         verdict.temporalWarning?.let { warning ->
@@ -161,7 +152,7 @@ fun VerdictDetailScreen(
 
         Spacer(Modifier.height(32.dp))
 
-        Text("EVIDENCE LIST [N=${verdict.stances.size}]", style = FalcoTypography.labelSmall, color = palette.textGhost)
+        Text("EVIDENCE LIST [N=${verdict.totalPapersPassedGate}]", style = FalcoTypography.labelSmall, color = palette.textGhost)
         Spacer(Modifier.height(16.dp))
 
         verdict.stances.sortedByDescending { it.paper.citationCount }.forEach { stance ->
@@ -182,48 +173,55 @@ fun VerdictDetailScreen(
             modelUsed = primaryModel
         )
 
+        Spacer(Modifier.height(24.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            ActionButton(
+                label = "SHARE VERDICT",
+                onClick = onShare,
+                modifier = Modifier.weight(1f)
+            )
+            ActionButton(
+                label = "SAVE TO HISTORY",
+                onClick = onSave,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        ActionButton(
+            label = "NEW CLAIM",
+            onClick = onBack,
+            modifier = Modifier.fillMaxWidth()
+        )
+
         Spacer(Modifier.height(80.dp))
     }
 }
 
 @Composable
-fun ConfidenceSegmentBar(confidence: Float, segments: Int = 13) {
-    val filled = (confidence * segments).roundToInt()
-    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        repeat(segments) { i ->
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(3.dp)
-                    .background(
-                        if (i < filled) LocalFalcoPalette.current.barFilled else LocalFalcoPalette.current.barEmpty,
-                        FalcoZeroShape
-                    )
-            )
-        }
-    }
-}
-
-@Composable
-private fun MetadataBlock(verdict: Verdict) {
-    Column {
-        MetaRow("PAPERS ANALYSED", "${verdict.stances.size} PASSED QUALITY GATE")
-        Spacer(Modifier.height(12.dp))
-        MetaRow("EVIDENCE BREAKDOWN", "${verdict.supportingCount} SUPPORT · ${verdict.opposingCount} OPPOSE · ${verdict.neutralCount} NEUTRAL")
-        Spacer(Modifier.height(12.dp))
-        MetaRow("DOMINANT FIELD", verdict.dominantField.uppercase())
-    }
-}
-
-@Composable
-private fun MetaRow(label: String, value: String) {
-    Column {
-        Text(label, style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
-        Spacer(Modifier.height(4.dp))
+private fun ActionButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val palette = LocalFalcoPalette.current
+    Box(
+        modifier = modifier
+            .height(48.dp)
+            .background(palette.bg, FalcoZeroShape)
+            .border(1.dp, palette.textGhost, FalcoZeroShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
         Text(
-            value,
-            style = FalcoTypography.bodySmall.copy(letterSpacing = FalcoDimens.LetterSpacingMeta),
-            color = LocalFalcoPalette.current.textBody
+            label,
+            style = FalcoTypography.labelSmall,
+            color = palette.textPrimary
         )
     }
 }
@@ -236,6 +234,7 @@ private fun EvidenceRow(stance: PaperStance) {
         Stance.SUPPORTS -> LocalFalcoPalette.current.stanceSupports
         Stance.NEUTRAL -> LocalFalcoPalette.current.stanceNeutral
         Stance.OPPOSES -> LocalFalcoPalette.current.stanceOpposes
+        Stance.INSUFFICIENT_EVIDENCE -> LocalFalcoPalette.current.textMuted
     }
     val groundingScore = stance.groundingScore ?: stance.confidence
 

@@ -8,6 +8,7 @@ import com.najmi.falco.data.remote.llm.GeminiClient
 import com.najmi.falco.data.remote.llm.GroqClient
 import com.najmi.falco.data.remote.llm.MistralClient
 import com.najmi.falco.data.remote.llm.OpenRouterClient
+import com.najmi.falco.data.remote.llm.RoutewayClient
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -47,4 +48,9 @@ abstract class LlmModule {
     @IntoMap
     @LlmProviderKey(LlmProvider.OPENROUTER)
     abstract fun bindOpenRouterClient(client: OpenRouterClient): LlmClient
+
+    @Binds
+    @IntoMap
+    @LlmProviderKey(LlmProvider.ROUTEWAY)
+    abstract fun bindRoutewayClient(client: RoutewayClient): LlmClient
 }

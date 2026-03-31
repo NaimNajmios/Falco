@@ -16,7 +16,8 @@ data class Verdict(
     val temporalWarning: String?,
     val completedAt: Long = System.currentTimeMillis(),
     val analysisMetadata: AnalysisMetadata = AnalysisMetadata(),
-    val uncertaintyInfo: UncertaintyInfo = UncertaintyInfo()
+    val uncertaintyInfo: UncertaintyInfo = UncertaintyInfo(),
+    val caveat: String? = null
 ) {
     val consensusInfo: ConsensusInfo
         get() = ConsensusInfo(

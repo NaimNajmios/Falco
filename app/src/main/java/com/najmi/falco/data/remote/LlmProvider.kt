@@ -6,5 +6,6 @@ enum class LlmProvider {
     MISTRAL,
     COHERE,
     CEREBRAS,
-    OPENROUTER
+    OPENROUTER,
+    ROUTEWAY
 }

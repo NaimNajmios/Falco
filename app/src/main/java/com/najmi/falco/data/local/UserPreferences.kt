@@ -10,6 +10,7 @@ data class UserPreferences(
     val userCohereKey: String? = null,
     val userCerebrasKey: String? = null,
     val userOpenRouterKey: String? = null,
+    val userRoutewayKey: String? = null,
     val enableSmartChunking: Boolean = false,
     val maxPapersToAnalyze: Int = 10,
     val earlyStopConfidence: Float = 0.85f

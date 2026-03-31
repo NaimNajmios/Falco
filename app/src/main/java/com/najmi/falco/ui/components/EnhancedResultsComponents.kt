@@ -23,7 +23,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.najmi.falco.domain.model.AnalysisDepth
@@ -164,7 +163,7 @@ fun AnalysisDepthMeter(
                 depth.name.lowercase().replaceFirstChar { it.uppercase() },
                 style = FalcoTypography.labelMedium.copy(fontWeight = FontWeight.Medium),
                 color = when (depth) {
-                    AnalysisDepth.DEEP -> palette.stanceSupports
+                    AnalysisDepth.DEEP -> palette.textPrimary
                     AnalysisDepth.STANDARD -> palette.textMuted
                     AnalysisDepth.LIGHT -> palette.textGhost
                 }
@@ -217,11 +216,7 @@ fun ConfidenceGauge(
     val confidencePct = (confidence * 100).toInt()
 
     val gaugeColor by animateColorAsState(
-        targetValue = when {
-            confidence < 0.5f -> Color(0xFFEF4444)
-            confidence < 0.8f -> Color(0xFFF59E0B)
-            else -> Color(0xFF22C55E)
-        },
+        targetValue = palette.textMuted,
         label = "gaugeColor"
     )
 
@@ -240,10 +235,10 @@ fun ConfidenceGauge(
                 when (certaintyLevel) {
                     CertaintyLevel.HIGH -> "High certainty"
                     CertaintyLevel.MODERATE -> "Moderate certainty"
-                    CertaintyLevel.LOW -> "Low - more research recommended"
+                    CertaintyLevel.LOW -> "Low certainty"
                 },
                 style = FalcoTypography.labelMedium.copy(fontWeight = FontWeight.Medium),
-                color = gaugeColor
+                color = palette.textMuted
             )
         }
 
@@ -261,7 +256,7 @@ fun ConfidenceGauge(
                     .fillMaxWidth(confidence)
                     .height(8.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(gaugeColor)
+                    .background(palette.barFilled)
             )
         }
 
@@ -360,11 +355,7 @@ fun ConfidenceFactorsTooltips(
                 Text(
                     factor.value,
                     style = FalcoTypography.labelMedium.copy(fontWeight = FontWeight.Medium),
-                    color = when (factor.impact) {
-                        "positive" -> palette.stanceSupports
-                        "negative" -> palette.stanceOpposes
-                        else -> palette.textBody
-                    }
+                    color = palette.textBody
                 )
             }
         }
@@ -485,7 +476,7 @@ fun UncertaintySection(
             UncertaintyItem(
                 icon = "⏱",
                 text = alert,
-                color = Color(0xFFF59E0B)
+                color = palette.textMuted
             )
             Spacer(Modifier.height(4.dp))
         }
@@ -494,7 +485,7 @@ fun UncertaintySection(
             UncertaintyItem(
                 icon = "⚠",
                 text = warning,
-                color = Color(0xFFF59E0B)
+                color = palette.textMuted
             )
             Spacer(Modifier.height(4.dp))
         }
@@ -578,9 +569,9 @@ fun ProvenanceFooter(
             }
 
             Column {
-                Text("Algorithm", style = FalcoTypography.labelMedium, color = palette.textGhost)
+                Text("Latency", style = FalcoTypography.labelMedium, color = palette.textGhost)
                 Text(
-                    metadata.algorithmVersion,
+                    "${metadata.analysisDurationMs}ms",
                     style = FalcoTypography.bodySmall,
                     color = palette.textMuted
                 )

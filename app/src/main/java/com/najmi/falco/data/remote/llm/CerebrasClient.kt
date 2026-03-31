@@ -26,7 +26,7 @@ import javax.inject.Singleton
 
 @Serializable
 data class CerebrasRequest(
-    val model: String = "llama3.1-8b-instant",
+    val model: String = "llama3.1-8b",
     val messages: List<CerebrasMessage>,
     val temperature: Float = 0.3f,
     @SerialName("max_tokens") val maxTokens: Int = 1024
