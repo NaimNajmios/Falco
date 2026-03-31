@@ -2,50 +2,52 @@
 
 # FALCO
 
-> **Multi-Agent Academic Verification System**
+> **Production-Grade Self-Correcting Multi-Agent Verification System**
 
-FALCO is a high-performance Android application designed to verify claims using a sophisticated multi-agent orchestration pipeline. By leveraging diverse academic databases and a fleet of advanced LLM providers, FALCO bridges the gap between casual claims and empirical evidence.
+FALCO is a high-performance Android application designed to verify complex claims using a sophisticated, self-correcting multi-agent orchestration pipeline. By leveraging diverse academic databases and a fleet of advanced LLMs, FALCO bridges the gap between casual claims and peer-reviewed empirical evidence.
 
 ## 🚀 Vision
 
-In an era of information overload, FALCO provides a rigorous, automated framework for academic fact-checking. It doesn't just search; it **reasons**, **filters**, and **synthesizes** information from peer-reviewed literature to provide a definitive verdict on any given hypothesis.
+In an era of information overload, FALCO provides a rigorous, automated framework for academic fact-checking. It doesn't just search; it **reasons**, **filters**, **challenges**, and **synthesizes** information from scientific literature to provide a definitive, evidence-backed verdict on any hypothesis.
 
-## 🧠 The Orchestration Pipeline
+## 🧠 Self-Correcting Orchestration Pipeline
 
-FALCO's core is the `FalcoOrchestrator`, which manages a sequence of specialized AI agents and diagnostic gates:
+FALCO's core is a dynamic, multi-stage pipeline managed by the `FalcoOrchestrator`. It employs a series of specialized agents and diagnostic gates to ensure maximum reliability:
 
-1.  **Claim Classifier**: Analyzes the input text to determine the type of claim and its underlying nuances.
-2.  **Query Expander**: Transforms the claim into complex academic search queries optimized for scientific databases.
-3.  **Multi-Source Retrieval**: Interfaces with academic repositories like **OpenAlex** and **Semantic Scholar** to fetch relevant peer-reviewed papers.
-4.  **Paper Quality Gate**: Automatically scores papers based on citation tiers, field-specific freshness (AI/ML vs. Medicine vs. History), and open-access status.
-5.  **Temporal Freshness Analysis**: Detects when evidence is "stale" for rapidly evolving fields and generates contextual alerts.
-6.  **Smart Stance Actor**: Performs **incremental chunk analysis** on long papers with **early stopping** capabilities. If a definitive stance is found early, it halts analysis to minimize token usage and latency.
-7.  **Aggregator**: Synthesizes all gathered evidence, weighting confidence levels and source quality to produce a final Dossier.
+1.  **Claim Classifier**: Analyzes the input to determine claim type and underlying technical nuances.
+2.  **Query Expander**: Transforms claims into optimized academic search queries.
+3.  **Multi-Source Retrieval**: Interfaces with **OpenAlex** and **Semantic Scholar** for comprehensive evidence gathering.
+4.  **Paper Quality Gate**: Field-aware scoring (citations, open-access, abstract depth) to filter for high-impact evidence.
+5.  **Temporal Freshness Analysis**: Time-aware alerts for rapidly evolving fields (e.g., AI/ML, Medicine).
+6.  **Smart Stance Actor**: Incremental chunk analysis with **Early Stopping** to minimize token usage and latency.
+7.  **Cross-Reference Engine**: Identifies consensus and flags outliers across all gathered stances to ensure balanced reporting.
+8.  **Stance Critic (Devil's Advocate)**: A dedicated agent that challenges initial interpretations to prevent over-inference or model bias.
+9.  **Algorithmic Grounding**: Automated verification of agent reasoning against original metadata.
+10. **Adaptive Retrieval Loop**: If the aggregator detects insufficient evidence, the system autonomously triggers a new search-verify cycle with refined queries.
 
 ## 🛡 Security & Resilience
 
 FALCO is built for production-grade reliability and data privacy:
 
--   **Industry-Standard Encryption**: All user API keys are stored using **AES256-GCM/SIV** via `EncryptedSharedPreferences` and Android's `MasterKey` system.
--   **Resilient LLM Routing**: The `ProviderRouter` implements intelligent fallback logic. If a primary provider is unavailable or rate-limited, FALCO automatically routes requests through a tiered failover system (**Groq** → **Gemini** → **Others**).
--   **Health Tracking**: Continuous monitoring of provider availability ensures minimal latency and maximum uptime.
+-   **Industry-Standard Encryption**: All user API keys are secured using **AES256-GCM/SIV** via `EncryptedSharedPreferences` and Android's `MasterKey` system.
+-   **Resilient Tiered Routing**: The `ProviderRouter` implements intelligent fallback logic (**Groq** → **Gemini** → **Cerebras/Mistral/Cohere**), ensuring high availability even during provider outages.
+-   **Live Health Monitoring**: Continuous status tracking to optimize for the fastest and most reliable model at any given moment.
 
-## ✨ Features
+## ✨ Advanced Features
 
--   **Intelligent Optimization**: Early-stopping stance analysis and incremental chunking for cost-effective verification.
--   **Persistent Dossier History**: Full CRUD support for past claims, allowing users to browse, re-examine, or delete verification records.
--   **Field-Aware Verification**: Specialized thresholds for different academic domains (e.g., higher freshness requirements for AI/ML).
--   **Expanded LLM Ecosystem**: Support for **Gemini**, **Groq**, **Cerebras**, **Cohere**, **Mistral**, and **OpenRouter**.
--   **Background Verification**: Support for high-latency tasks using **WorkManager**, ensuring verifications continue even if the app is closed.
--   **Premium UI/UX**: A sleek, dark-themed interface with real-time stage tracking and persistent state management.
+-   **Deep Evidence Analytics**: Transparency on tokens analyzed, analysis duration, and efficiency gains vs. traditional full-text processing.
+-   **Field-Aware Verification**: Specialized thresholds for different academic domains (AI, Medicine, Social Sciences, etc.).
+-   **Persistent Dossier History**: Full CRUD support for past claims, allowing users to browse, re-examine, or delete detailed verification records.
+-   **Real-time Diagnostic Logging**: Integrated `DebugLogger` for full transparency into the orchestration process.
+-   **Premium UI/UX**: Sleek, dark-themed interface built with Jetpack Compose, featuring real-time stage tracking in the `PipelineScreen`.
 
 ## 🛠 Tech Stack
 
 -   **Language**: Kotlin
 -   **UI Framework**: Jetpack Compose (Material 3)
 -   **Architecture**: Clean Architecture + MVVM + Agent-Oriented Design
+-   **Security**: AndroidX Crypto (MasterKey & EncryptedSharedPreferences)
 -   **Persistence**: Room (Dossier history, Quota tracking, and Claims)
--   **Security**: AndroidX Crypto (EncryptedSharedPreferences)
 -   **Remote**: Ktor (Multiplatform-ready HTTP client)
 -   **Background Tasks**: Android WorkManager
 -   **Dependency Injection**: Hilt
@@ -65,5 +67,5 @@ FALCO is built for production-grade reliability and data privacy:
     git clone https://github.com/najminajmi/falco.git
     ```
 2.  Open the project in Android Studio.
-3.  **Configure API Keys**: In the app's **Settings**, provide your own keys for the providers you wish to use. These keys are stored securely on your device.
+3.  **Configure API Keys**: In the app's **Settings**, provide your own keys for the providers you wish to use.
 4.  Build and run on your device or emulator.

@@ -9,7 +9,10 @@ data class RecentClaim(
     val type: String,
     val submittedAt: Long,
     val lean: String?,
-    val confidence: Float?
+    val confidence: Float?,
+    val supportingCount: Int = 0,
+    val opposingCount: Int = 0,
+    val neutralCount: Int = 0
 )
 
 interface IVerdictRepository {

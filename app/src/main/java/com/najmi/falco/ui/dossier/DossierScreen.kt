@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.najmi.falco.domain.model.Stance
 import com.najmi.falco.domain.repository.RecentClaim
+import com.najmi.falco.ui.components.ConfidenceSegmentBar
 import com.najmi.falco.ui.theme.LocalFalcoPalette
 import com.najmi.falco.ui.theme.FalcoDimens
 import com.najmi.falco.ui.theme.FalcoTypography
@@ -122,24 +123,27 @@ private fun HistoryItem(
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val palette = LocalFalcoPalette.current
+
     val stanceColor = claim.lean?.let { lean ->
         when (lean) {
-            "SUPPORTS" -> LocalFalcoPalette.current.stanceSupports
-            "OPPOSES" -> LocalFalcoPalette.current.stanceOpposes
-            else -> LocalFalcoPalette.current.stanceNeutral
+            "SUPPORTS" -> palette.stanceSupports
+            "OPPOSES" -> palette.stanceOpposes
+            "INSUFFICIENT_EVIDENCE" -> palette.textMuted
+            else -> palette.stanceNeutral
         }
-    } ?: LocalFalcoPalette.current.textGhost
+    } ?: palette.textGhost
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(LocalFalcoPalette.current.surface)
-            .border(1.dp, LocalFalcoPalette.current.divider, FalcoZeroShape)
+            .background(palette.surface)
+            .border(1.dp, palette.divider, FalcoZeroShape)
             .clickable(onClick = onClick)
             .padding(16.dp)
     ) {
         Column {
-             Row(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -147,7 +151,7 @@ private fun HistoryItem(
                 Text(
                     claim.text.take(40).let { if (claim.text.length > 40) "$it..." else it },
                     style = FalcoTypography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                    color = LocalFalcoPalette.current.textPrimary,
+                    color = palette.textPrimary,
                     modifier = Modifier.weight(1f),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
@@ -165,36 +169,79 @@ private fun HistoryItem(
                     Text(
                         "[X]",
                         style = FalcoTypography.labelSmall,
-                        color = LocalFalcoPalette.current.textGhost,
+                        color = palette.textGhost,
                         modifier = Modifier.clickable { onDelete() }
                     )
                 }
             }
+
             Spacer(Modifier.height(8.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     claim.type,
                     style = FalcoTypography.labelSmall,
-                    color = LocalFalcoPalette.current.textGhost
+                    color = palette.textGhost
                 )
                 claim.confidence?.let { confidence ->
+                    ConfidenceSegmentBar(
+                        confidence = confidence,
+                        segments = 5,
+                        modifier = Modifier.width(60.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
                     Text(
-                        "${(confidence * 100).toInt()}% confidence",
+                        "${(confidence * 100).toInt()}%",
                         style = FalcoTypography.labelSmall,
-                        color = LocalFalcoPalette.current.textMuted
+                        color = palette.textMuted
                     )
                 }
             }
-            Spacer(Modifier.height(4.dp))
-            Text(
-                formatTimestamp(claim.submittedAt),
-                style = FalcoTypography.labelSmall,
-                color = LocalFalcoPalette.current.textGhost
-            )
+
+            Spacer(Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                val total = claim.supportingCount + claim.opposingCount + claim.neutralCount
+                if (total > 0) {
+                    EvidenceCountChip("S", claim.supportingCount, palette.stanceSupports)
+                    EvidenceCountChip("O", claim.opposingCount, palette.stanceOpposes)
+                    EvidenceCountChip("N", claim.neutralCount, palette.stanceNeutral)
+                    Spacer(Modifier.weight(1f))
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
+                Text(
+                    formatTimestamp(claim.submittedAt),
+                    style = FalcoTypography.labelSmall,
+                    color = palette.textGhost
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun EvidenceCountChip(label: String, count: Int, color: androidx.compose.ui.graphics.Color) {
+    val palette = LocalFalcoPalette.current
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            "[$label]",
+            style = FalcoTypography.labelSmall.copy(letterSpacing = FalcoDimens.LetterSpacingWide),
+            color = color
+        )
+        Spacer(Modifier.width(2.dp))
+        Text(
+            "$count",
+            style = FalcoTypography.labelSmall,
+            color = palette.textBody
+        )
     }
 }
 

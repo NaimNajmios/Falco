@@ -10,13 +10,19 @@ data class ClaimWithVerdict(
     val type: String,
     val submittedAt: Long,
     val lean: String?,
-    val confidence: Float?
+    val confidence: Float?,
+    val supportingCount: Int = 0,
+    val opposingCount: Int = 0,
+    val neutralCount: Int = 0
 )
 
 @Dao
 interface ClaimDao {
     @Query("""
-        SELECT c.id, c.text, c.type, c.submittedAt, v.lean, v.confidence
+        SELECT c.id, c.text, c.type, c.submittedAt, v.lean, v.confidence,
+               COALESCE(v.supportingCount, 0) as supportingCount,
+               COALESCE(v.opposingCount, 0) as opposingCount,
+               COALESCE(v.neutralCount, 0) as neutralCount
         FROM claims c
         LEFT JOIN verdicts v ON c.id = v.claimId
         ORDER BY c.submittedAt DESC

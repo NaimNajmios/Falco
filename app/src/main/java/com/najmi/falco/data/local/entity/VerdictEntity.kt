@@ -25,7 +25,12 @@ data class VerdictEntity(
     val summary: String,
     val totalPapersRetrieved: Int,
     val totalPapersPassedGate: Int,
+    val supportingCount: Int,
+    val opposingCount: Int,
+    val neutralCount: Int,
+    val dominantField: String,
     val temporalWarning: String?,
+    val caveat: String?,
     val completedAt: Long,
     val analysisMetadataJson: String? = null,
     val uncertaintyInfoJson: String? = null
