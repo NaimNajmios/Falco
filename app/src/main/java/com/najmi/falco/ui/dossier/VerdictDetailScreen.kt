@@ -102,11 +102,9 @@ fun VerdictDetailScreen(
 
         Spacer(Modifier.height(24.dp))
 
-        Spacer(Modifier.height(24.dp))
-
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             FalcoMetaRow("LATENCY", "${verdict.analysisMetadata.analysisDurationMs}ms")
             FalcoMetaRow("METADATA", "${verdict.totalPapersPassedGate} passed · ${verdict.totalPapersRetrieved} retrieved")
