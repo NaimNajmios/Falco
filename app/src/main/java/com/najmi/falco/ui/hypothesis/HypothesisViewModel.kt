@@ -7,6 +7,8 @@ import android.content.ServiceConnection
 import android.os.IBinder
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.najmi.falco.data.local.DebugLogBuffer
+import com.najmi.falco.data.local.DebugLogEntry
 import com.najmi.falco.domain.model.VerificationState
 import com.najmi.falco.domain.model.Verdict
 import com.najmi.falco.domain.repository.IVerdictRepository
@@ -55,6 +57,9 @@ class HypothesisViewModel @Inject constructor(
             }
             stateFlow.asStateFlow()
         }
+    
+    val debugLogEntries: StateFlow<List<DebugLogEntry>> = DebugLogBuffer.entries
+    val stageTimings: StateFlow<List<Pair<String, Long>>> = DebugLogBuffer.stageTimings
 
     fun onTextChanged(text: String) {
         _claimText.value = text

@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
@@ -37,6 +39,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.najmi.falco.data.local.DebugLogBuffer
+import com.najmi.falco.data.local.DebugLogEntry
 import com.najmi.falco.data.local.DebugLogger
 import com.najmi.falco.domain.model.Stance
 import com.najmi.falco.domain.model.VerificationState
@@ -45,6 +49,7 @@ import com.najmi.falco.ui.hypothesis.HypothesisViewModel
 import com.najmi.falco.ui.components.ConfidenceSegmentBar
 import com.najmi.falco.ui.components.ConfidenceGauge
 import com.najmi.falco.ui.components.ConsensusIndicator
+import com.najmi.falco.ui.components.DebugLogExportButton
 import com.najmi.falco.ui.components.EvidenceRow
 import com.najmi.falco.ui.components.TokenUsageCard
 import com.najmi.falco.ui.theme.LocalFalcoPalette
@@ -62,6 +67,9 @@ fun PipelineScreen(
 ) {
     val state by hypothesisViewModel.verificationState.collectAsState()
     val claimText by hypothesisViewModel.claimText.collectAsState()
+    val debugEntries by hypothesisViewModel.debugLogEntries.collectAsState()
+    val stageTimings by hypothesisViewModel.stageTimings.collectAsState()
+    val isDebugEnabled = DebugLogger.isEnabled()
     var stageStartTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var currentTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
     
@@ -106,11 +114,21 @@ fun PipelineScreen(
                     color = LocalFalcoPalette.current.textPrimary
                 )
                 Spacer(Modifier.height(8.dp))
-                Text(
-                    "SOURCE_ID: ${hypothesisViewModel.currentClaimId}",
-                    style = FalcoTypography.labelSmall,
-                    color = LocalFalcoPalette.current.textGhost
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "SOURCE_ID: ${hypothesisViewModel.currentClaimId}",
+                        style = FalcoTypography.labelSmall,
+                        color = LocalFalcoPalette.current.textGhost
+                    )
+                    if (isDebugEnabled) {
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            "[DEBUG]",
+                            style = FalcoTypography.labelSmall,
+                            color = LocalFalcoPalette.current.textMuted
+                        )
+                    }
+                }
             }
         }
 
@@ -128,11 +146,11 @@ fun PipelineScreen(
 
                 Spacer(Modifier.height(24.dp))
 
-                RealTimeExtractionPanel(state = state)
+                RealTimeExtractionPanel(state = state, debugEntries = debugEntries)
 
                 Spacer(Modifier.height(16.dp))
 
-                LiveMonitor()
+                LiveMonitor(debugEntries = debugEntries, stageTimings = stageTimings)
 
                 Spacer(Modifier.height(32.dp))
 
@@ -388,24 +406,15 @@ private fun StageRow(
 }
 
 @Composable
-private fun RealTimeExtractionPanel(state: VerificationState) {
-    var showLog by remember { mutableStateOf(false) }
-    var messageLog by remember { mutableStateOf(listOf<Pair<Long, String>>()) }
-    
+private fun RealTimeExtractionPanel(
+    state: VerificationState,
+    @Suppress("UNUSED_PARAMETER") debugEntries: List<DebugLogEntry>
+) {
     val message = when (state) {
         is VerificationState.InProgress -> state.message
         is VerificationState.Error -> state.message
         is VerificationState.Success -> null
         is VerificationState.Idle -> "Awaiting input..."
-    }
-    
-    androidx.compose.runtime.LaunchedEffect(message) {
-        message?.let {
-            messageLog = messageLog + (System.currentTimeMillis() to it)
-            if (messageLog.size > 20) {
-                messageLog = messageLog.takeLast(20)
-            }
-        }
     }
 
     Box(
@@ -415,63 +424,22 @@ private fun RealTimeExtractionPanel(state: VerificationState) {
             .border(1.dp, LocalFalcoPalette.current.divider, FalcoZeroShape)
     ) {
         Column {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showLog = !showLog }
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("REAL-TIME_EXTRACTION", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
-                Spacer(Modifier.weight(1f))
+            Box(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    if (showLog) "[- LOG]" else "[+ LOG]",
-                    style = FalcoTypography.labelSmall,
-                    color = LocalFalcoPalette.current.textMuted
+                    message ?: "Awaiting input...",
+                    style = FalcoTypography.bodySmall,
+                    color = if (state is VerificationState.Error) LocalFalcoPalette.current.textMuted else LocalFalcoPalette.current.textBody
                 )
-            }
-
-            if (showLog && messageLog.isNotEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .padding(bottom = 16.dp)
-                        .background(LocalFalcoPalette.current.bg)
-                        .padding(8.dp)
-                ) {
-                    messageLog.takeLast(10).reversed().forEach { (_, msg) ->
-                        Row {
-                            Text(
-                                ">",
-                                style = FalcoTypography.labelMedium,
-                                color = LocalFalcoPalette.current.textGhost
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                msg,
-                                style = FalcoTypography.labelMedium,
-                                color = LocalFalcoPalette.current.textMuted
-                            )
-                        }
-                        Spacer(Modifier.height(4.dp))
-                    }
-                }
-            } else {
-                Box(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        message ?: "Awaiting input...",
-                        style = FalcoTypography.bodySmall,
-                        color = if (state is VerificationState.Error) LocalFalcoPalette.current.textMuted else LocalFalcoPalette.current.textBody
-                    )
-                }
             }
         }
     }
 }
 
 @Composable
-private fun LiveMonitor() {
+private fun LiveMonitor(
+    debugEntries: List<DebugLogEntry>,
+    stageTimings: List<Pair<String, Long>>
+) {
     var showDebug by remember { mutableStateOf(false) }
     val isDebugEnabled = DebugLogger.isEnabled()
 
@@ -504,57 +472,122 @@ private fun LiveMonitor() {
                     ),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("LIVE MONITOR: NEURAL_LAYER_08", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
+                Text("LIVE MONITOR", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
                 Spacer(Modifier.weight(1f))
                 if (isDebugEnabled) {
-                    Text("[DEBUG]", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textMuted)
-                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = if (showDebug) "[- DEBUG]" else "[+ DEBUG]",
+                        style = FalcoTypography.labelSmall,
+                        color = LocalFalcoPalette.current.textMuted
+                    )
                 }
                 Text("■", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textPrimary)
             }
             Spacer(Modifier.height(12.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(3.dp)
-            ) {
-                bars.forEachIndexed { index, animState ->
-                    val height = (animState.value * 32).dp
-                    val color = when {
-                        index % 4 == 0 -> LocalFalcoPalette.current.barFilled
-                        index % 2 == 0 -> LocalFalcoPalette.current.textMuted
-                        else -> LocalFalcoPalette.current.barEmpty.copy(alpha = 0.5f)
+            if (!isDebugEnabled) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    bars.forEachIndexed { index, animState ->
+                        val height = (animState.value * 32).dp
+                        val color = when {
+                            index % 4 == 0 -> LocalFalcoPalette.current.barFilled
+                            index % 2 == 0 -> LocalFalcoPalette.current.textMuted
+                            else -> LocalFalcoPalette.current.barEmpty.copy(alpha = 0.5f)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(height)
+                                .background(color, FalcoZeroShape)
+                        )
                     }
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(height)
-                            .background(color, FalcoZeroShape)
-                    )
                 }
             }
-
-            Spacer(Modifier.height(8.dp))
 
             if (showDebug && isDebugEnabled) {
                 Spacer(Modifier.height(12.dp))
+                
+                if (stageTimings.isNotEmpty()) {
+                    Text("STAGE_TIMINGS", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
+                    Spacer(Modifier.height(8.dp))
+                    val totalMs = stageTimings.sumOf { it.second }
+                    stageTimings.takeLast(5).forEach { (name, ms) ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(name, style = FalcoTypography.labelMedium, color = LocalFalcoPalette.current.textMuted)
+                            Text("${ms}ms", style = FalcoTypography.labelMedium, color = LocalFalcoPalette.current.textBody)
+                        }
+                    }
+                    if (totalMs > 0) {
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("TOTAL", style = FalcoTypography.labelSmall.copy(fontWeight = FontWeight.Bold), color = LocalFalcoPalette.current.textPrimary)
+                            Text("${totalMs}ms", style = FalcoTypography.labelSmall.copy(fontWeight = FontWeight.Bold), color = LocalFalcoPalette.current.textPrimary)
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+                
+                Text("LOG", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
+                Spacer(Modifier.height(4.dp))
+                
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .height(200.dp)
                         .background(LocalFalcoPalette.current.bg)
                         .padding(8.dp)
                 ) {
-                    Column {
-                        Text("DEBUG PANEL", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textPrimary)
-                        Spacer(Modifier.height(4.dp))
-                        Text("Toggle debug mode in Settings to enable logging", style = FalcoTypography.labelMedium, color = LocalFalcoPalette.current.textMuted)
-                        Spacer(Modifier.height(4.dp))
-                        Text("Pipeline stages logged to logcat (tag: FALCO)", style = FalcoTypography.labelMedium, color = LocalFalcoPalette.current.textMuted)
+                    LazyColumn {
+                        items(debugEntries.takeLast(20).reversed()) { entry ->
+                            DebugLogEntryRow(entry = entry)
+                        }
                     }
                 }
+                
+                Spacer(Modifier.height(8.dp))
+                
+                DebugLogExportButton()
             }
         }
     }
+}
+
+@Composable
+private fun DebugLogEntryRow(entry: DebugLogEntry) {
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "[${entry.category}]",
+            style = FalcoTypography.labelMedium,
+            color = when (entry.category) {
+                "STAGE" -> LocalFalcoPalette.current.stanceSupports
+                "LLM" -> LocalFalcoPalette.current.textMuted
+                "NET" -> LocalFalcoPalette.current.stanceNeutral
+                else -> LocalFalcoPalette.current.textGhost
+            }
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            text = when (entry) {
+                is DebugLogEntry.Stage -> "${entry.stageName}: ${entry.durationMs}ms"
+                is DebugLogEntry.Llm -> "${entry.provider}/${entry.model}: ${entry.tokens}t (${entry.latencyMs}ms)"
+                is DebugLogEntry.Network -> "${entry.method} ${entry.url.take(30)} -> ${entry.status}"
+                is DebugLogEntry.Message -> "${entry.level}: ${entry.message.take(40)}"
+            },
+            style = FalcoTypography.labelMedium,
+            color = LocalFalcoPalette.current.textMuted,
+            modifier = Modifier.weight(1f)
+        )
+    }
+    Spacer(Modifier.height(2.dp))
 }
 
 @Composable
