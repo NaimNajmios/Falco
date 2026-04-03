@@ -8,5 +8,6 @@ data class ClaimEntity(
     @PrimaryKey val id: String,
     val text: String,
     val type: String,
-    val submittedAt: Long
+    val submittedAt: Long,
+    val isFavorite: Boolean = false
 )

@@ -168,13 +168,29 @@ class VerdictRepositoryImpl @Inject constructor(
                     confidence = cwv.confidence,
                     supportingCount = cwv.supportingCount,
                     opposingCount = cwv.opposingCount,
-                    neutralCount = cwv.neutralCount
+                    neutralCount = cwv.neutralCount,
+                    isFavorite = cwv.isFavorite
                 )
             }
         }
     }
 
+    override suspend fun toggleFavorite(id: String) {
+        val claim = claimDao.getClaimById(id)
+        claim?.let {
+            claimDao.updateFavorite(id, !it.isFavorite)
+        }
+    }
+
     override suspend fun deleteClaim(id: String) {
         claimDao.deleteById(id)
+    }
+
+    override suspend fun getById(id: String): Verdict? {
+        return getByClaimId(id)
+    }
+
+    override fun exportAllVerdicts(): Flow<List<Verdict>> {
+        return getAllVerdicts()
     }
 }

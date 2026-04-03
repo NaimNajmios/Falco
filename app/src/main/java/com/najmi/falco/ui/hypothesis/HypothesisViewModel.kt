@@ -65,6 +65,10 @@ class HypothesisViewModel @Inject constructor(
         _claimText.value = text
     }
 
+    fun setClaimText(text: String) {
+        _claimText.value = text
+    }
+
     fun verify(text: String) {
         val claimId = UUID.randomUUID().toString().take(8).uppercase()
         _currentClaimId.value = claimId

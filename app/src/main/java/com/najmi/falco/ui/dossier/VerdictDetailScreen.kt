@@ -43,7 +43,8 @@ import com.najmi.falco.ui.theme.FalcoZeroShape
 fun VerdictDetailScreen(
     verdict: Verdict,
     onBack: () -> Unit,
-    @Suppress("UNUSED_PARAMETER") onShare: () -> Unit = {},
+    onReverify: (String) -> Unit = {},
+    onShare: () -> Unit = {},
     onSave: () -> Unit = {}
 ) {
     val palette = LocalFalcoPalette.current
@@ -206,8 +207,8 @@ fun VerdictDetailScreen(
                 modifier = Modifier.weight(1f)
             )
             ActionButton(
-                label = "SAVE TO HISTORY",
-                onClick = onSave,
+                label = "RE-VERIFY",
+                onClick = { onReverify(verdict.claim) },
                 modifier = Modifier.weight(1f)
             )
         }

@@ -12,7 +12,8 @@ data class RecentClaim(
     val confidence: Float?,
     val supportingCount: Int = 0,
     val opposingCount: Int = 0,
-    val neutralCount: Int = 0
+    val neutralCount: Int = 0,
+    val isFavorite: Boolean = false
 )
 
 interface IVerdictRepository {
@@ -21,4 +22,7 @@ interface IVerdictRepository {
     fun getAllVerdicts(): Flow<List<Verdict>>
     fun getRecentClaims(): Flow<List<RecentClaim>>
     suspend fun deleteClaim(id: String)
+    suspend fun getById(id: String): Verdict?
+    fun exportAllVerdicts(): Flow<List<Verdict>>
+    suspend fun toggleFavorite(id: String)
 }

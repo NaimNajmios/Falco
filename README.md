@@ -10,14 +10,20 @@ FALCO is a high-performance Android application designed to verify complex claim
 
 In an era of information overload, FALCO provides a rigorous, automated framework for academic fact-checking. It doesn't just search; it **reasons**, **filters**, **challenges**, and **synthesizes** information from scientific literature to provide a definitive, evidence-backed verdict on any hypothesis.
 
+## ⚙️ Consumer-Grade Configuration
+
+-   **Dynamic Provider Ecosystem**: Integrated support for a diverse fleet of LLM providers including **Gemini**, **Groq**, **Cerebras**, **OpenRouter**, **Mistral**, **Cohere**, and **Routeway**.
+-   **Real-Time Key Validation**: A sophisticated validation system that ensures API keys are functional with a live connectivity test before saving.
+-   **User-Centric Preferences**:
+    -   **Dark Mode**: A premium, eye-friendly interface for low-light research.
+    -   **Debug Mode**: Toggleable diagnostic logging for full operational transparency.
+    -   **Preferred Provider Selection**: High-level control over the system's primary agentic backbone.
+
 ## 🛡 Production-Grade Infrastructure
 
--   **Background Orchestration**: The `VerificationForegroundService` ensures that long-running verification tasks are resilient to OS process management. Verifications continue even if the app is minimized.
--   **Real-Time Progress Tracking**: Integrated `FalcoNotificationManager` providing live updates on pipeline stages and processing counts directly in the Android notification shade.
--   **Operational Transparency**: A sophisticated `DebugLogger` system that captures granular diagnostics, including:
-    -   **Network Latency**: Real-time tracking of academic database API performance.
-    -   **LLM Metrics**: Precise token usage and latency monitoring for each provider (Groq, Gemini, etc.).
-    -   **Pipeline Stage Benchmarking**: Accurate timing for every agentic operation.
+-   **Background Orchestration**: The `VerificationForegroundService` ensures verifications are resilient to OS process management, continuing even when the app is minimized.
+-   **Real-Time Progress Tracking**: Live updates on pipeline stages and processing counts via Android notifications.
+-   **Operational Transparency**: A granular `DebugLogger` system tracking network latency, LLM token metrics, and pipeline stage benchmarks.
 
 ## 🧠 Self-Correcting Orchestration Pipeline
 
@@ -36,10 +42,7 @@ FALCO's core is a dynamic, multi-stage pipeline managed by the `FalcoOrchestrato
 
 ## ✨ Advanced Features
 
--   **Deep Evidence Synthesis**: The **Verdict Detail** screen provides a deep-dive into the results, featuring:
-    -   **Synthesis Quality**: A comprehensive summary of grounding data.
-    -   **Evidence Tiers**: Citation-sorted evidence list with stance-lean indicators.
-    -   **Provenance Footer**: Full transparency on which LLM provider and model produced each piece of reasoning.
+-   **Deep Evidence Synthesis**: The **Verdict Detail** screen provides a deep-dive into synthesis quality, evidence tiers, and provider provenance.
 -   **Evidence-Backed History**: Persistent **Dossier** history with stance-lean visualizations and confidence segment bars.
 -   **Security**: **AES256-GCM/SIV** encrypted storage for all sensitive API keys.
 -   **Premium UI/UX**: Sleek, dark-themed interface built with Jetpack Compose.

@@ -127,6 +127,11 @@ private fun FalcoApp() {
                             VerdictDetailScreen(
                                 verdict = verdict,
                                 onBack = { dossierViewModel.clearSelection() },
+                                onReverify = { claimText ->
+                                    hypothesisViewModel.setClaimText(claimText)
+                                    dossierViewModel.clearSelection()
+                                    selectedTab = FalcoTab.Hypothesis
+                                },
                                 onShare = {
                                     val shareText = buildString {
                                         appendLine("FALCO Verdict")

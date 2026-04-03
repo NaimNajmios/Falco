@@ -13,7 +13,8 @@ data class ClaimWithVerdict(
     val confidence: Float?,
     val supportingCount: Int = 0,
     val opposingCount: Int = 0,
-    val neutralCount: Int = 0
+    val neutralCount: Int = 0,
+    val isFavorite: Boolean = false
 )
 
 @Dao
@@ -22,7 +23,8 @@ interface ClaimDao {
         SELECT c.id, c.text, c.type, c.submittedAt, v.lean, v.confidence,
                COALESCE(v.supportingCount, 0) as supportingCount,
                COALESCE(v.opposingCount, 0) as opposingCount,
-               COALESCE(v.neutralCount, 0) as neutralCount
+               COALESCE(v.neutralCount, 0) as neutralCount,
+               COALESCE(c.isFavorite, 0) as isFavorite
         FROM claims c
         LEFT JOIN verdicts v ON c.id = v.claimId
         ORDER BY c.submittedAt DESC
@@ -47,4 +49,7 @@ interface ClaimDao {
 
     @Query("DELETE FROM claims WHERE id = :id")
     suspend fun deleteById(id: String)
+
+    @Query("UPDATE claims SET isFavorite = :isFavorite WHERE id = :id")
+    suspend fun updateFavorite(id: String, isFavorite: Boolean)
 }
