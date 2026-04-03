@@ -24,6 +24,7 @@ interface FalcoPalette {
     val stanceOpposes: Color
     val barFilled: Color
     val barEmpty: Color
+    val errorIndicator: Color
 }
 
 private val DarkFalcoPalette = object : FalcoPalette {
@@ -42,6 +43,7 @@ private val DarkFalcoPalette = object : FalcoPalette {
     override val stanceOpposes = Color(0xFF505050)
     override val barFilled = Color(0xFFFFFFFF)
     override val barEmpty = Color(0xFF2E2E2E)
+    override val errorIndicator = Color(0xFFFF4444)
 }
 
 private val LightFalcoPalette = object : FalcoPalette {
@@ -60,6 +62,7 @@ private val LightFalcoPalette = object : FalcoPalette {
     override val stanceOpposes = Color(0xFFAAAAAA)
     override val barFilled = Color(0xFF000000)
     override val barEmpty = Color(0xFFE5E5E5)
+    override val errorIndicator = Color(0xFFCC0000)
 }
 
 // ─── Composition Local ─────────────────────────────────────────────────────

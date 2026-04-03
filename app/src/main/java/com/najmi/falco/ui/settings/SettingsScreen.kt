@@ -12,30 +12,31 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.najmi.falco.BuildConfig
 import com.najmi.falco.data.remote.LlmProvider
 import com.najmi.falco.ui.theme.LocalFalcoPalette
 import com.najmi.falco.ui.theme.FalcoDimens
@@ -107,6 +108,7 @@ fun SettingsScreen(
 
         var apiKeysExpanded by remember { mutableStateOf(true) }
         var pendingKeys by remember { mutableStateOf<Map<LlmProvider, String>>(emptyMap()) }
+        var showClearConfirmDialog by remember { mutableStateOf(false) }
 
         SettingsSectionHeaderWithToggle(
             label = "API KEYS",
@@ -122,6 +124,8 @@ fun SettingsScreen(
                     provider = provider,
                     currentKey = viewModel.getCurrentKey(provider),
                     hasKey = viewModel.hasUserKey(provider),
+                    validationStatus = viewModel.getValidationStatus(provider),
+                    isValidating = viewModel.isValidating(provider),
                     onKeyChange = { key ->
                         pendingKeys = pendingKeys + (provider to key)
                     }
@@ -133,12 +137,9 @@ fun SettingsScreen(
 
             if (pendingKeys.isNotEmpty()) {
                 FalcoAccentButton(
-                    text = "Save Changes",
+                    text = "Save & Validate",
                     onClick = {
-                        val keysToSave = pendingKeys.toMap()
-                        keysToSave.forEach { (prov, key) ->
-                            viewModel.setUserApiKey(prov, key)
-                        }
+                        viewModel.validateAndSaveKeys(pendingKeys.toMap())
                         pendingKeys = emptyMap()
                     }
                 )
@@ -147,10 +148,18 @@ fun SettingsScreen(
 
             FalcoGhostButton(
                 text = "Clear All Keys",
-                onClick = {
+                onClick = { showClearConfirmDialog = true }
+            )
+        }
+
+        if (showClearConfirmDialog) {
+            ClearAllKeysDialog(
+                onConfirm = {
                     viewModel.clearAllKeys()
                     pendingKeys = emptyMap()
-                }
+                    showClearConfirmDialog = false
+                },
+                onDismiss = { showClearConfirmDialog = false }
             )
         }
 
@@ -179,11 +188,11 @@ fun SettingsScreen(
             Column {
                 Text("BUILD INFO", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
                 Spacer(Modifier.height(8.dp))
-                SettingsInfoRow("VERSION", "1.0.0_STABLE")
+                SettingsInfoRow("VERSION", BuildConfig.VERSION_NAME)
                 Spacer(Modifier.height(4.dp))
-                SettingsInfoRow("ENV", if (prefs.isDebugMode) "DEBUG" else "PRODUCTION")
+                SettingsInfoRow("ENV", if (prefs.isDebugMode) "DEBUG" else BuildConfig.BUILD_TYPE)
                 Spacer(Modifier.height(4.dp))
-                SettingsInfoRow("BUILD", "20260328")
+                SettingsInfoRow("BUILD", BuildConfig.VERSION_CODE.toString())
             }
         }
 
@@ -196,16 +205,25 @@ private fun ApiKeyInputRow(
     provider: LlmProvider,
     currentKey: String,
     hasKey: Boolean,
+    validationStatus: KeyValidationStatus,
+    isValidating: Boolean,
     onKeyChange: (String) -> Unit
 ) {
     var showKey by remember { mutableStateOf(false) }
     var inputValue by remember(currentKey) { mutableStateOf(currentKey) }
 
+    val statusColor = when {
+        isValidating -> LocalFalcoPalette.current.textMuted
+        validationStatus == KeyValidationStatus.VALID -> LocalFalcoPalette.current.textPrimary
+        validationStatus == KeyValidationStatus.INVALID -> LocalFalcoPalette.current.errorIndicator
+        else -> if (hasKey) LocalFalcoPalette.current.textPrimary else LocalFalcoPalette.current.textGhost
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(LocalFalcoPalette.current.surface)
-            .border(1.dp, LocalFalcoPalette.current.divider, FalcoZeroShape)
+            .border(1.dp, if (validationStatus == KeyValidationStatus.INVALID) LocalFalcoPalette.current.errorIndicator else LocalFalcoPalette.current.divider, FalcoZeroShape)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -219,13 +237,31 @@ private fun ApiKeyInputRow(
                 Spacer(Modifier.width(8.dp))
                 Box(
                     modifier = Modifier
-                        .width(8.dp)
-                        .height(8.dp)
-                        .background(
-                            if (hasKey) LocalFalcoPalette.current.textPrimary else LocalFalcoPalette.current.textGhost,
-                            FalcoZeroShape
-                        )
+                        .size(8.dp)
+                        .background(statusColor, FalcoZeroShape)
                 )
+                if (isValidating) {
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        "...",
+                        style = FalcoTypography.labelSmall,
+                        color = LocalFalcoPalette.current.textMuted
+                    )
+                } else if (validationStatus == KeyValidationStatus.VALID) {
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        "OK",
+                        style = FalcoTypography.labelSmall,
+                        color = LocalFalcoPalette.current.textPrimary
+                    )
+                } else if (validationStatus == KeyValidationStatus.INVALID) {
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        "INVALID",
+                        style = FalcoTypography.labelSmall,
+                        color = LocalFalcoPalette.current.errorIndicator
+                    )
+                }
             }
             Spacer(Modifier.height(4.dp))
             BasicTextField(
@@ -471,4 +507,49 @@ private fun SettingsInfoRow(label: String, value: String) {
         Text(label, style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
         Text(value, style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textMuted)
     }
+}
+
+@Composable
+private fun ClearAllKeysDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                "CLEAR ALL API KEYS?",
+                style = FalcoTypography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                color = LocalFalcoPalette.current.textPrimary
+            )
+        },
+        text = {
+            Text(
+                "This will remove all saved API keys. You will need to re-enter them to use LLM providers.",
+                style = FalcoTypography.bodySmall,
+                color = LocalFalcoPalette.current.textBody
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(
+                    "CLEAR",
+                    style = FalcoTypography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                    color = LocalFalcoPalette.current.errorIndicator
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    "CANCEL",
+                    style = FalcoTypography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                    color = LocalFalcoPalette.current.textMuted
+                )
+            }
+        },
+        containerColor = LocalFalcoPalette.current.surface,
+        titleContentColor = LocalFalcoPalette.current.textPrimary,
+        textContentColor = LocalFalcoPalette.current.textBody
+    )
 }

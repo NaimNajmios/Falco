@@ -2,21 +2,26 @@ package com.najmi.falco.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.najmi.falco.data.local.DebugLogger
 import com.najmi.falco.data.local.UserPreferences
 import com.najmi.falco.data.local.UserPreferencesRepository
+import com.najmi.falco.data.remote.LlmClient
 import com.najmi.falco.data.remote.LlmProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class SettingsUiState(
     val preferences: UserPreferences = UserPreferences(),
     val isLoading: Boolean = true,
     val editingProvider: LlmProvider? = null,
-    val keyValidationStatus: Map<LlmProvider, KeyValidationStatus> = emptyMap()
+    val keyValidationStatus: Map<LlmProvider, KeyValidationStatus> = emptyMap(),
+    val validatingProviders: Set<LlmProvider> = emptySet()
 )
 
 enum class KeyValidationStatus {
@@ -28,7 +33,8 @@ enum class KeyValidationStatus {
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val userPreferencesRepository: UserPreferencesRepository
+    private val userPreferencesRepository: UserPreferencesRepository,
+    private val clients: Map<LlmProvider, @JvmSuppressWildcards LlmClient>
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -66,8 +72,69 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             if (key.isBlank()) {
                 userPreferencesRepository.setUserApiKey(provider, null)
+                _uiState.value = _uiState.value.copy(
+                    keyValidationStatus = _uiState.value.keyValidationStatus - provider
+                )
             } else {
                 userPreferencesRepository.setUserApiKey(provider, key)
+            }
+        }
+    }
+
+    fun validateAndSaveKeys(keys: Map<LlmProvider, String>) {
+        viewModelScope.launch {
+            val validating = keys.filter { it.value.isNotBlank() }.keys
+            _uiState.value = _uiState.value.copy(
+                validatingProviders = validating,
+                keyValidationStatus = _uiState.value.keyValidationStatus.mapValues { (provider, status) ->
+                    if (provider in validating) KeyValidationStatus.VALIDATING else status
+                }
+            )
+
+            keys.forEach { (provider, key) ->
+                if (key.isNotBlank()) {
+                    userPreferencesRepository.setUserApiKey(provider, key)
+                    val result = validateApiKey(provider, key)
+                    _uiState.value = _uiState.value.copy(
+                        keyValidationStatus = _uiState.value.keyValidationStatus + (provider to result),
+                        validatingProviders = _uiState.value.validatingProviders - provider
+                    )
+                }
+            }
+        }
+    }
+
+    private suspend fun validateApiKey(provider: LlmProvider, key: String): KeyValidationStatus {
+        return withContext(Dispatchers.IO) {
+            try {
+                val client = clients[provider]
+                if (client == null) {
+                    DebugLogger.w("[Settings] No client for provider: $provider")
+                    return@withContext KeyValidationStatus.UNKNOWN
+                }
+
+                val testPrompt = "Hi"
+                val response = client.chat("test: $testPrompt")
+                
+                if (response.text.isNotBlank()) {
+                    KeyValidationStatus.VALID
+                } else {
+                    KeyValidationStatus.INVALID
+                }
+            } catch (e: Exception) {
+                val errorMsg = e.message?.lowercase() ?: ""
+                when {
+                    errorMsg.contains("invalid") || errorMsg.contains("unauthorized") || 
+                    errorMsg.contains("api key") || errorMsg.contains("401") ||
+                    errorMsg.contains("403") || errorMsg.contains("malformed") -> {
+                        DebugLogger.d("[Settings] Key validation failed for $provider: ${e.message}")
+                        KeyValidationStatus.INVALID
+                    }
+                    else -> {
+                        DebugLogger.w("[Settings] Key validation error for $provider: ${e.message}")
+                        KeyValidationStatus.UNKNOWN
+                    }
+                }
             }
         }
     }
@@ -104,9 +171,18 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun getValidationStatus(provider: LlmProvider): KeyValidationStatus {
+        return _uiState.value.keyValidationStatus[provider] ?: KeyValidationStatus.UNKNOWN
+    }
+
+    fun isValidating(provider: LlmProvider): Boolean {
+        return provider in _uiState.value.validatingProviders
+    }
+
     fun clearAllKeys() {
         viewModelScope.launch {
             userPreferencesRepository.clearAllUserKeys()
+            _uiState.value = _uiState.value.copy(keyValidationStatus = emptyMap())
         }
     }
 }

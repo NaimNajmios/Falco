@@ -10,46 +10,49 @@ FALCO is a high-performance Android application designed to verify complex claim
 
 In an era of information overload, FALCO provides a rigorous, automated framework for academic fact-checking. It doesn't just search; it **reasons**, **filters**, **challenges**, and **synthesizes** information from scientific literature to provide a definitive, evidence-backed verdict on any hypothesis.
 
+## 🛡 Production-Grade Infrastructure
+
+-   **Background Orchestration**: The `VerificationForegroundService` ensures that long-running verification tasks are resilient to OS process management. Verifications continue even if the app is minimized.
+-   **Real-Time Progress Tracking**: Integrated `FalcoNotificationManager` providing live updates on pipeline stages and processing counts directly in the Android notification shade.
+-   **Operational Transparency**: A sophisticated `DebugLogger` system that captures granular diagnostics, including:
+    -   **Network Latency**: Real-time tracking of academic database API performance.
+    -   **LLM Metrics**: Precise token usage and latency monitoring for each provider (Groq, Gemini, etc.).
+    -   **Pipeline Stage Benchmarking**: Accurate timing for every agentic operation.
+
 ## 🧠 Self-Correcting Orchestration Pipeline
 
-FALCO's core is a dynamic, multi-stage pipeline managed by the `FalcoOrchestrator`. It employs a series of specialized agents and diagnostic gates to ensure maximum reliability:
+FALCO's core is a dynamic, multi-stage pipeline managed by the `FalcoOrchestrator`:
 
-1.  **Claim Classifier**: Analyzes the input to determine claim type and underlying technical nuances.
-2.  **Query Expander**: Transforms claims into optimized academic search queries.
-3.  **Multi-Source Retrieval**: Interfaces with **OpenAlex** and **Semantic Scholar** for comprehensive evidence gathering.
-4.  **Paper Quality Gate**: Field-aware scoring (citations, open-access, abstract depth) to filter for high-impact evidence.
-5.  **Temporal Freshness Analysis**: Time-aware alerts for rapidly evolving fields (e.g., AI/ML, Medicine).
-6.  **Smart Stance Actor**: Incremental chunk analysis with **Early Stopping** to minimize token usage and latency.
-7.  **Cross-Reference Engine**: Identifies consensus and flags outliers across all gathered stances to ensure balanced reporting.
-8.  **Stance Critic (Devil's Advocate)**: A dedicated agent that challenges initial interpretations to prevent over-inference or model bias.
-9.  **Algorithmic Grounding**: Automated verification of agent reasoning against original metadata.
-10. **Adaptive Retrieval Loop**: If the aggregator detects insufficient evidence, the system autonomously triggers a new search-verify cycle with refined queries.
-
-## 🛡 Security & Resilience
-
--   **Industry-Standard Encryption**: All user API keys are secured using **AES256-GCM/SIV** via `EncryptedSharedPreferences` and Android's `MasterKey` system.
--   **Resilient Tiered Routing**: The `ProviderRouter` implements intelligent fallback logic (**Groq** → **Gemini** → **Others**), ensuring high availability even during provider outages.
+1.  **Claim Classifier**: Analyzes technical nuances and claim types.
+2.  **Query Expander**: Generates optimized academic search queries.
+3.  **Multi-Source Retrieval**: Interfaces with **OpenAlex** and **Semantic Scholar**.
+4.  **Paper Quality Gate**: Field-aware scoring (citations, open-access, depth).
+5.  **Temporal Freshness Analysis**: Time-aware alerts for rapidly evolving fields.
+6.  **Smart Stance Actor**: Incremental chunk analysis with **Early Stopping** for cost efficiency.
+7.  **Cross-Reference Engine**: Identifies consensus and flags outlier evidence.
+8.  **Stance Critic (Devil's Advocate)**: Challenges initial classifications to prevent bias.
+9.  **Algorithmic Grounding**: Automated verification of reasoning against metadata.
+10. **Adaptive Retrieval Loop**: Autonomous search-verify cycles if the initial data is insufficient.
 
 ## ✨ Advanced Features
 
--   **Evidence-Backed Search History**: The **Dossier** screen provides a comprehensive view of past verifications, featuring:
-    -   **Stance-Lean Visualization**: Quick-glance indicators for SUPPORTS, OPPOSES, and NEUTRAL stances.
-    -   **Evidence Counts (S/O/N)**: Real-time counts of supporting, opposing, and neutral papers for each record.
-    -   **Confidence Segment Bars**: Visual certainty levels for every historical claim.
--   **Intelligent Optimization**: Early-stopping stance analysis and incremental chunking for cost-effective verification.
--   **Persistent Dossier History**: Full CRUD support for past claims, allowing users to browse, re-examine, or delete detailed verification records.
--   **Field-Aware Verification**: Specialized thresholds for different academic domains (AI, Medicine, Social Sciences, etc.).
--   **Expanded LLM Ecosystem**: Support for **Gemini**, **Groq**, **Cerebras**, **Cohere**, **Mistral**, and **OpenRouter**.
--   **Premium UI/UX**: Sleek, dark-themed interface built with Jetpack Compose, featuring real-time stage tracking in the `PipelineScreen`.
+-   **Deep Evidence Synthesis**: The **Verdict Detail** screen provides a deep-dive into the results, featuring:
+    -   **Synthesis Quality**: A comprehensive summary of grounding data.
+    -   **Evidence Tiers**: Citation-sorted evidence list with stance-lean indicators.
+    -   **Provenance Footer**: Full transparency on which LLM provider and model produced each piece of reasoning.
+-   **Evidence-Backed History**: Persistent **Dossier** history with stance-lean visualizations and confidence segment bars.
+-   **Security**: **AES256-GCM/SIV** encrypted storage for all sensitive API keys.
+-   **Premium UI/UX**: Sleek, dark-themed interface built with Jetpack Compose.
 
 ## 🛠 Tech Stack
 
 -   **Language**: Kotlin
 -   **UI Framework**: Jetpack Compose (Material 3)
 -   **Architecture**: Clean Architecture + MVVM + Agent-Oriented Design
+-   **Security**: AndroidX Crypto (MasterKey & EncryptedSharedPreferences)
 -   **Persistence**: Room (Dossier history, Quota tracking, and Claims)
 -   **Remote**: Ktor (Multiplatform-ready HTTP client)
--   **Background Tasks**: Android WorkManager
+-   **Background Tasks**: Android WorkManager & Foreground Services
 -   **Dependency Injection**: Hilt
 -   **Asynchrony**: Kotlin Coroutines & Flow
 
