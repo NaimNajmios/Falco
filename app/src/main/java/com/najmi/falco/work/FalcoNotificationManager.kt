@@ -10,6 +10,7 @@ import androidx.core.app.NotificationCompat
 import com.najmi.falco.MainActivity
 import com.najmi.falco.R
 import com.najmi.falco.domain.model.Verdict
+import com.najmi.falco.domain.model.VerificationStage
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -37,13 +38,16 @@ class FalcoNotificationManager @Inject constructor(
         }
     }
 
-    fun showProgress(claimId: String, message: String) {
+    fun showProgress(claimId: String, stage: VerificationStage, processedCount: Int, totalCount: Int, message: String) {
+        val (progress, maxProgress) = calculateProgress(stage, processedCount, totalCount)
+        
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_falco)
-            .setContentTitle("Verifying claim")
+            .setContentTitle("${stage.label}...")
             .setContentText(message)
             .setOngoing(true)
-            .setProgress(0, 0, true)
+            .setProgress(maxProgress, progress, false)
+            .setOnlyAlertOnce(true)
             .build()
 
         notificationManager.notify(claimId.hashCode(), notification)
@@ -59,6 +63,26 @@ class FalcoNotificationManager @Inject constructor(
             .build()
 
         notificationManager.notify(claimId.hashCode(), notification)
+    }
+
+    private fun calculateProgress(stage: VerificationStage, processedCount: Int, totalCount: Int): Pair<Int, Int> {
+        val baseProgress = when (stage) {
+            VerificationStage.CLASSIFYING -> 10
+            VerificationStage.EXPANDING -> 20
+            VerificationStage.RETRIEVING -> 30
+            VerificationStage.QUALITY_GATING -> 40
+            VerificationStage.TEMPORAL_CHECK -> 50
+            VerificationStage.ACTOR_CLASSIFICATION -> {
+                if (totalCount > 0) {
+                    val actorProgress = 60 + ((processedCount.toFloat() / totalCount) * 20).toInt()
+                    actorProgress.coerceIn(60, 80)
+                } else 60
+            }
+            VerificationStage.CRITIC_REVIEW -> 85
+            VerificationStage.GROUNDING -> 90
+            VerificationStage.AGGREGATING -> 100
+        }
+        return Pair(baseProgress, 100)
     }
 
     fun showVerdictReady(claimId: String, verdict: Verdict) {

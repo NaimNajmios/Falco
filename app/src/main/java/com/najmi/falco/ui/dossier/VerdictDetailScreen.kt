@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -23,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.BackHandler
 import com.najmi.falco.domain.model.Stance
 import com.najmi.falco.domain.model.Verdict
 import com.najmi.falco.ui.components.ConfidenceFactorsTooltips
@@ -33,6 +35,7 @@ import com.najmi.falco.ui.components.ProvenanceFooter
 import com.najmi.falco.ui.components.ShareBottomSheet
 import com.najmi.falco.ui.components.UncertaintySection
 import com.najmi.falco.ui.theme.LocalFalcoPalette
+import com.najmi.falco.ui.theme.FalcoDimens
 import com.najmi.falco.ui.theme.FalcoTypography
 import com.najmi.falco.ui.theme.FalcoZeroShape
 
@@ -53,6 +56,10 @@ fun VerdictDetailScreen(
     
     var showShareSheet by androidx.compose.runtime.mutableStateOf(false)
 
+    BackHandler(enabled = true) {
+        onBack()
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -60,7 +67,22 @@ fun VerdictDetailScreen(
             .padding(24.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        Spacer(Modifier.height(48.dp))
+        Spacer(Modifier.height(24.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Start,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "← BACK",
+                style = FalcoTypography.labelSmall.copy(letterSpacing = FalcoDimens.LetterSpacingWide),
+                color = palette.textMuted,
+                modifier = Modifier.clickable { onBack() }
+            )
+        }
+
+        Spacer(Modifier.height(24.dp))
 
         Text(
             "VERDICT",

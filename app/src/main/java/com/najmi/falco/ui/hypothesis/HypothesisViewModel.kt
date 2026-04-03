@@ -1,5 +1,10 @@
 package com.najmi.falco.ui.hypothesis
 
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
+import android.os.IBinder
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.najmi.falco.domain.model.VerificationState
@@ -7,7 +12,9 @@ import com.najmi.falco.domain.model.Verdict
 import com.najmi.falco.domain.repository.IVerdictRepository
 import com.najmi.falco.domain.repository.RecentClaim
 import com.najmi.falco.domain.usecase.VerifyClaimUseCase
+import com.najmi.falco.service.VerificationForegroundService
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,7 +26,8 @@ import javax.inject.Inject
 @HiltViewModel
 class HypothesisViewModel @Inject constructor(
     private val verifyClaimUseCase: VerifyClaimUseCase,
-    private val verdictRepository: IVerdictRepository
+    private val verdictRepository: IVerdictRepository,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     val verificationState: StateFlow<VerificationState> = verifyClaimUseCase.verificationState
@@ -37,6 +45,7 @@ class HypothesisViewModel @Inject constructor(
     val errorMessage: String? get() = _errorMessage.value
 
     private var verificationJob: Job? = null
+    private var serviceIntent: Intent? = null
 
     val recentClaims: StateFlow<List<RecentClaim>> = verdictRepository.getRecentClaims()
         .let { flow ->
@@ -52,8 +61,16 @@ class HypothesisViewModel @Inject constructor(
     }
 
     fun verify(text: String) {
-        _currentClaimId.value = UUID.randomUUID().toString().take(8).uppercase()
+        val claimId = UUID.randomUUID().toString().take(8).uppercase()
+        _currentClaimId.value = claimId
         _errorMessage.value = null
+        
+        serviceIntent = Intent(context, VerificationForegroundService::class.java).apply {
+            putExtra(VerificationForegroundService.EXTRA_CLAIM_TEXT, text)
+            putExtra(VerificationForegroundService.EXTRA_CLAIM_ID, claimId)
+        }
+        context.startForegroundService(serviceIntent)
+        
         verificationJob = viewModelScope.launch {
             verifyClaimUseCase.execute(text).collect { state ->
                 when (state) {
@@ -78,6 +95,11 @@ class HypothesisViewModel @Inject constructor(
         verificationJob?.cancel()
         verifyClaimUseCase.reset()
         _errorMessage.value = "Verification cancelled by user"
+        
+        serviceIntent?.let { intent ->
+            context.stopService(intent)
+            serviceIntent = null
+        }
     }
 
     fun cancelVerification() = haltVerification()
