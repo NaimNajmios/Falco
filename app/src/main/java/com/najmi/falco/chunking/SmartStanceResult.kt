@@ -81,6 +81,7 @@ data class SmartStanceResult(
             chunksAnalyzed = analyzedChunks,
             analysisDepth = com.najmi.falco.domain.model.AnalysisDepth.fromChunks(chunksUsed),
             providerUsed = providerUsed ?: "unknown",
+            actorProviderUsed = providerUsed,
             didStopEarly = didStopEarly,
             confidenceFactors = confidenceFactors
         )

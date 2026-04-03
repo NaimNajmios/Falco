@@ -23,7 +23,9 @@ import com.najmi.falco.domain.model.VerificationStage
 import com.najmi.falco.domain.model.VerificationState
 import com.najmi.falco.domain.repository.IPaperRepository
 import com.najmi.falco.domain.repository.IVerdictRepository
+import com.najmi.falco.provider.ActorCriticProviderSelector
 import com.najmi.falco.provider.AllProvidersFailedException
+import com.najmi.falco.provider.ProviderAssignment
 import com.najmi.falco.provider.RateLimitException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -46,7 +48,8 @@ class FalcoOrchestrator @Inject constructor(
     private val stanceCritic: StanceCriticAgent,
     private val algorithmicGrounding: AlgorithmicGrounding,
     private val aggregator: AggregatorAgent,
-    private val verdictRepo: IVerdictRepository
+    private val verdictRepo: IVerdictRepository,
+    private val providerSelector: ActorCriticProviderSelector
 ) {
     fun verify(claimText: String): Flow<VerificationState> = channelFlow {
         val totalStart = System.currentTimeMillis()
@@ -63,6 +66,12 @@ class FalcoOrchestrator @Inject constructor(
                 return@channelFlow
             }
             DebugLogger.stage("CLASSIFYING", System.currentTimeMillis() - stageStart)
+
+            providerSelector.logHealthStatus()
+            val providers = providerSelector.selectProviders(claim.type, claim.text)
+            DebugLogger.d("[PIPELINE] Provider selection: ${providers.rationale}")
+            DebugLogger.d("[PIPELINE] Actor: ${providers.actor.name} (fallbacks: ${providers.actorFallbacks.joinToString { it.name }})")
+            DebugLogger.d("[PIPELINE] Critic: ${providers.critic.name} (fallbacks: ${providers.criticFallbacks.joinToString { it.name }})")
 
             stageStart = System.currentTimeMillis()
             send(VerificationState.InProgress(VerificationStage.EXPANDING, "Generating academic search queries..."))
@@ -117,11 +126,13 @@ class FalcoOrchestrator @Inject constructor(
             }
 
             stageStart = System.currentTimeMillis()
-            send(VerificationState.InProgress(VerificationStage.ACTOR_CLASSIFICATION, "Classifying stances across ${analyzedPapers.size} papers..."))
+            val totalPapers = analyzedPapers.size
+            send(VerificationState.InProgress(VerificationStage.ACTOR_CLASSIFICATION, "Classifying stances across $totalPapers papers...", 0, totalPapers))
             
             val backpressureQueue = PaperBackpressureQueue()
             val actorResults = mutableListOf<Result<PaperStance>>()
             var totalTokensAnalyzed = 0
+            var processedCount = 0
             
             launch {
                 analyzedPapers.forEach { qualityPaper ->
@@ -132,9 +143,22 @@ class FalcoOrchestrator @Inject constructor(
             
             val producer = launch {
                 backpressureQueue.papersFlow.collect { paper ->
-                    val result = stanceActor.execute(SmartStanceActorInput(claim.text, paper))
+                    val result = stanceActor.execute(
+                        SmartStanceActorInput(
+                            claimText = claim.text,
+                            paper = paper,
+                            preferredProvider = providers.actor
+                        ),
+                        providers.actor
+                    )
+                    var shouldUpdateProgress = false
                     synchronized(actorResults) {
                         actorResults.add(result)
+                        processedCount++
+                        shouldUpdateProgress = true
+                    }
+                    if (shouldUpdateProgress) {
+                        send(VerificationState.InProgress(VerificationStage.ACTOR_CLASSIFICATION, "Processing papers...", processedCount, totalPapers))
                     }
                 }
             }
@@ -174,7 +198,23 @@ class FalcoOrchestrator @Inject constructor(
             stageStart = System.currentTimeMillis()
             send(VerificationState.InProgress(VerificationStage.CRITIC_REVIEW, "Critic reviewing stances..."))
             
-            val criticResults = enrichedStances.map { stanceCritic.execute(StanceCriticInput(claim.text, it)) }
+            val criticResults = enrichedStances.map { stance ->
+                val result = stanceCritic.execute(StanceCriticInput(claim.text, stance), providers.critic)
+                result.onFailure { e ->
+                    DebugLogger.w("[PIPELINE] Primary critic (${providers.critic}) failed for ${stance.paper.title.take(30)}: ${e.message}")
+                    providers.criticFallbacks.forEach { fallback ->
+                        if (result.isFailure) {
+                            DebugLogger.d("[PIPELINE] Trying critic fallback: $fallback")
+                            val fallbackResult = stanceCritic.execute(StanceCriticInput(claim.text, stance), fallback)
+                            if (fallbackResult.isSuccess) {
+                                DebugLogger.d("[PIPELINE] Fallback critic ($fallback) succeeded for ${stance.paper.title.take(30)}")
+                                return@forEach
+                            }
+                        }
+                    }
+                }
+                result
+            }
             
             val criticFailures = criticResults.count { it.isFailure }
             if (criticFailures > 0) {
@@ -182,7 +222,7 @@ class FalcoOrchestrator @Inject constructor(
             }
             
             val criticStances = criticResults.mapNotNull { it.getOrNull() }
-            DebugLogger.stage("CRITIC_REVIEW", System.currentTimeMillis() - stageStart)
+            DebugLogger.stage("CRITIC_REVIEW (${criticStances.size} succeeded)", System.currentTimeMillis() - stageStart)
 
             stageStart = System.currentTimeMillis()
             send(VerificationState.InProgress(VerificationStage.GROUNDING, "Verifying reasoning against abstracts..."))
@@ -252,7 +292,14 @@ class FalcoOrchestrator @Inject constructor(
                         
                         val additionalProducer = launch {
                             additionalBackpressureQueue.papersFlow.collect { paper ->
-                                val actorResult = stanceActor.execute(SmartStanceActorInput(claim.text, paper))
+                                val actorResult = stanceActor.execute(
+                                    SmartStanceActorInput(
+                                        claimText = claim.text,
+                                        paper = paper,
+                                        preferredProvider = providers.actor
+                                    ),
+                                    providers.actor
+                                )
                                 synchronized(additionalActorResults) {
                                     additionalActorResults.add(actorResult)
                                 }
@@ -276,7 +323,9 @@ class FalcoOrchestrator @Inject constructor(
                             )
                             val additionalEnrichedStances = additionalCrossRefResult.getOrNull()?.enrichedStances ?: additionalActorStances
                             
-                            val additionalCriticResults = additionalEnrichedStances.map { stanceCritic.execute(StanceCriticInput(claim.text, it)) }
+                            val additionalCriticResults = additionalEnrichedStances.map { stance ->
+                                stanceCritic.execute(StanceCriticInput(claim.text, stance), providers.critic)
+                            }
                             val additionalCriticStances = additionalCriticResults.mapNotNull { it.getOrNull() }
                             val additionalGroundedStances = algorithmicGrounding.verify(additionalCriticStances)
                             

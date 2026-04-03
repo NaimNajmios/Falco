@@ -18,6 +18,8 @@ data class PaperStance(
     val analysisDepth: AnalysisDepth = AnalysisDepth.STANDARD,
     val providerUsed: String = "unknown",
     val modelUsed: String? = null,
+    val actorProviderUsed: String? = null,
+    val criticProviderUsed: String? = null,
     val didStopEarly: Boolean = false,
     val confidenceFactors: List<ConfidenceFactor> = emptyList()
 )

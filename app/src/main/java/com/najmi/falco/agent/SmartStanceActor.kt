@@ -17,7 +17,8 @@ data class SmartStanceActorInput(
     val enableSmartChunking: Boolean = true,
     val enableIncrementalAnalysis: Boolean = true,
     val confidenceThreshold: Float = SmartStanceActor.DEFAULT_CONFIDENCE_THRESHOLD,
-    val minChunks: Int = SmartStanceActor.DEFAULT_MIN_CHUNKS
+    val minChunks: Int = SmartStanceActor.DEFAULT_MIN_CHUNKS,
+    val preferredProvider: LlmProvider? = null
 )
 
 @Singleton

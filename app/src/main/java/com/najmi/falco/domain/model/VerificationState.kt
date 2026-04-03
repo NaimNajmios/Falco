@@ -16,8 +16,16 @@ sealed class VerificationState {
     object Idle : VerificationState()
     data class InProgress(
         val stage: VerificationStage,
-        val message: String
-    ) : VerificationState()
+        val message: String,
+        val processedCount: Int = 0,
+        val totalCount: Int = 0
+    ) : VerificationState() {
+        val progress: Float
+            get() = if (totalCount > 0) processedCount.toFloat() / totalCount else 0f
+        
+        val progressText: String
+            get() = if (totalCount > 0) "$processedCount/$totalCount" else ""
+    }
     data class Success(val verdict: Verdict) : VerificationState()
     data class Error(val stage: VerificationStage?, val message: String) : VerificationState()
 }

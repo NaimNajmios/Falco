@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -23,16 +22,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.najmi.falco.domain.model.PaperStance
 import com.najmi.falco.domain.model.Stance
 import com.najmi.falco.domain.model.Verdict
-import com.najmi.falco.ui.components.ChunksExplorer
 import com.najmi.falco.ui.components.ConfidenceFactorsTooltips
 import com.najmi.falco.ui.components.ConfidenceSegmentBar
+import com.najmi.falco.ui.components.EvidenceRow
 import com.najmi.falco.ui.components.FalcoMetaRow
 import com.najmi.falco.ui.components.ProvenanceFooter
+import com.najmi.falco.ui.components.ShareBottomSheet
 import com.najmi.falco.ui.components.UncertaintySection
 import com.najmi.falco.ui.theme.LocalFalcoPalette
 import com.najmi.falco.ui.theme.FalcoTypography
@@ -42,7 +40,7 @@ import com.najmi.falco.ui.theme.FalcoZeroShape
 fun VerdictDetailScreen(
     verdict: Verdict,
     onBack: () -> Unit,
-    onShare: () -> Unit = {},
+    @Suppress("UNUSED_PARAMETER") onShare: () -> Unit = {},
     onSave: () -> Unit = {}
 ) {
     val palette = LocalFalcoPalette.current
@@ -52,6 +50,8 @@ fun VerdictDetailScreen(
         Stance.OPPOSES -> palette.stanceOpposes
         Stance.INSUFFICIENT_EVIDENCE -> palette.textMuted
     }
+    
+    var showShareSheet by androidx.compose.runtime.mutableStateOf(false)
 
     Column(
         modifier = Modifier
@@ -158,10 +158,7 @@ fun VerdictDetailScreen(
         Spacer(Modifier.height(16.dp))
 
         verdict.stances.sortedByDescending { it.paper.citationCount }.forEach { stance ->
-            EvidenceRow(stance = stance)
-            Spacer(Modifier.height(1.dp))
-            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(palette.divider))
-            Spacer(Modifier.height(1.dp))
+            EvidenceRow(paperStance = stance)
         }
 
         val primaryProvider = verdict.stances.firstOrNull()?.providerUsed
@@ -183,7 +180,7 @@ fun VerdictDetailScreen(
         ) {
             ActionButton(
                 label = "SHARE VERDICT",
-                onClick = onShare,
+                onClick = { showShareSheet = true },
                 modifier = Modifier.weight(1f)
             )
             ActionButton(
@@ -202,6 +199,13 @@ fun VerdictDetailScreen(
         )
 
         Spacer(Modifier.height(80.dp))
+    }
+    
+    if (showShareSheet) {
+        ShareBottomSheet(
+            verdict = verdict,
+            onDismiss = { showShareSheet = false }
+        )
     }
 }
 
@@ -228,92 +232,4 @@ private fun ActionButton(
     }
 }
 
-@Composable
-private fun EvidenceRow(stance: PaperStance) {
-    var expanded by remember { mutableStateOf(false) }
-    val finalStance = stance.finalStance ?: stance.actorStance
-    val stanceTextColor = when (finalStance) {
-        Stance.SUPPORTS -> LocalFalcoPalette.current.stanceSupports
-        Stance.NEUTRAL -> LocalFalcoPalette.current.stanceNeutral
-        Stance.OPPOSES -> LocalFalcoPalette.current.stanceOpposes
-        Stance.INSUFFICIENT_EVIDENCE -> LocalFalcoPalette.current.textMuted
-    }
-    val groundingScore = stance.groundingScore ?: stance.confidence
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { expanded = !expanded }
-            .padding(vertical = 12.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("[${finalStance.name}]", style = FalcoTypography.labelSmall, color = stanceTextColor)
-            Spacer(Modifier.width(8.dp))
-            Text(
-                stance.paper.title.uppercase().take(50),
-                style = FalcoTypography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                color = LocalFalcoPalette.current.textPrimary
-            )
-            Spacer(Modifier.weight(1f))
-            Text("→", style = FalcoTypography.bodySmall, color = LocalFalcoPalette.current.textGhost)
-        }
-        Spacer(Modifier.height(4.dp))
-        Row {
-            Spacer(Modifier.width(24.dp))
-            Text(
-                "${stance.paper.authors.firstOrNull() ?: "Unknown"}, (${stance.paper.year ?: "N/A"}) · ${stance.paper.citationCount} citations",
-                style = FalcoTypography.labelMedium,
-                color = LocalFalcoPalette.current.textMuted
-            )
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Spacer(Modifier.width(24.dp))
-            Text("GROUNDING", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
-            Spacer(Modifier.width(8.dp))
-            Text(
-                String.format("%.2f", groundingScore),
-                style = FalcoTypography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                color = LocalFalcoPalette.current.textBody
-            )
-            stance.didStopEarly?.let {
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "Early stop",
-                    style = FalcoTypography.labelSmall,
-                    color = LocalFalcoPalette.current.textGhost
-                )
-            }
-        }
-
-        if (stance.chunksAnalyzed.isNotEmpty()) {
-            Spacer(Modifier.height(4.dp))
-            var chunksExpanded by remember { mutableStateOf(false) }
-            ChunksExplorer(
-                chunks = stance.chunksAnalyzed,
-                expanded = chunksExpanded,
-                onToggle = { chunksExpanded = !chunksExpanded },
-                modifier = Modifier.padding(start = 24.dp)
-            )
-        }
-
-        if (expanded) {
-            Spacer(Modifier.height(8.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 24.dp)
-                    .background(LocalFalcoPalette.current.surface)
-                    .padding(12.dp)
-            ) {
-                Column {
-                    Text("ACTOR: ${stance.actorReasoning}", style = FalcoTypography.bodySmall, color = LocalFalcoPalette.current.textMuted)
-                    stance.criticChallenge?.let { challenge ->
-                        Spacer(Modifier.height(8.dp))
-                        Text("CRITIC: $challenge", style = FalcoTypography.bodySmall, color = LocalFalcoPalette.current.textGhost)
-                    }
-                }
-            }
-        }
-    }
-}

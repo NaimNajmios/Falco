@@ -22,12 +22,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -41,10 +43,14 @@ import com.najmi.falco.domain.model.VerificationState
 import com.najmi.falco.domain.model.VerificationStage
 import com.najmi.falco.ui.hypothesis.HypothesisViewModel
 import com.najmi.falco.ui.components.ConfidenceSegmentBar
+import com.najmi.falco.ui.components.ConfidenceGauge
+import com.najmi.falco.ui.components.ConsensusIndicator
+import com.najmi.falco.ui.components.EvidenceRow
+import com.najmi.falco.ui.components.TokenUsageCard
 import com.najmi.falco.ui.theme.LocalFalcoPalette
-import com.najmi.falco.ui.theme.FalcoDimens
 import com.najmi.falco.ui.theme.FalcoTypography
 import com.najmi.falco.ui.theme.FalcoZeroShape
+import com.najmi.falco.ui.theme.FalcoDimens
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
@@ -56,6 +62,23 @@ fun PipelineScreen(
 ) {
     val state by hypothesisViewModel.verificationState.collectAsState()
     val claimText by hypothesisViewModel.claimText.collectAsState()
+    var stageStartTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var currentTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    
+    LaunchedEffect(state) {
+        if (state is VerificationState.InProgress) {
+            while (true) {
+                kotlinx.coroutines.delay(1000)
+                currentTick = System.currentTimeMillis()
+            }
+        }
+    }
+    
+    LaunchedEffect(state) {
+        if (state is VerificationState.InProgress) {
+            stageStartTime = System.currentTimeMillis()
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -101,7 +124,7 @@ fun PipelineScreen(
                 ErrorResult(state = state as VerificationState.Error, onNewClaim = onNewClaim)
             }
             else -> {
-                StageList(state = state)
+                StageList(state = state, stageStartTime = stageStartTime, currentTick = currentTick)
 
                 Spacer(Modifier.height(24.dp))
 
@@ -133,37 +156,33 @@ private fun VerdictResult(
         Stance.OPPOSES -> LocalFalcoPalette.current.stanceOpposes
         Stance.INSUFFICIENT_EVIDENCE -> LocalFalcoPalette.current.textMuted
     }
-    val confidencePct = (verdict.confidence * 100).roundToInt()
+    
+    var selectedFilter by remember { mutableStateOf<Stance?>(null) }
+    var selectedSort by remember { mutableStateOf(EvidenceSort.CITATIONS) }
+    
+    val filteredStances = verdict.stances.filter { stance ->
+        val finalStance = stance.finalStance ?: stance.actorStance
+        selectedFilter == null || finalStance == selectedFilter
+    }
+    
+    val sortedStances = when (selectedSort) {
+        EvidenceSort.CITATIONS -> filteredStances.sortedByDescending { it.paper.citationCount }
+        EvidenceSort.YEAR -> filteredStances.sortedByDescending { it.paper.year ?: 0 }
+        EvidenceSort.GROUNDING -> filteredStances.sortedByDescending { it.groundingScore ?: it.confidence }
+    }
 
     Text("VERIFICATION COMPLETE", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
     Spacer(Modifier.height(16.dp))
 
     Text(verdict.lean.name, style = FalcoTypography.displayLarge, color = stanceColor)
-    Spacer(Modifier.height(8.dp))
-
-    Text("$confidencePct%  CONFIDENCE", style = FalcoTypography.headlineSmall, color = LocalFalcoPalette.current.textBody)
-    Spacer(Modifier.height(8.dp))
-
-    ConfidenceSegmentBar(confidence = verdict.confidence)
-
     Spacer(Modifier.height(16.dp))
 
-    verdict.analysisMetadata?.let { metadata ->
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                "LATENCY: ${metadata.analysisDurationMs}ms",
-                style = FalcoTypography.labelSmall,
-                color = LocalFalcoPalette.current.textGhost
-            )
-            Spacer(Modifier.width(16.dp))
-            Text(
-                "AUTH: ${verdict.claimId.take(8).uppercase()}",
-                style = FalcoTypography.labelSmall,
-                color = LocalFalcoPalette.current.textGhost
-            )
-        }
-        Spacer(Modifier.height(12.dp))
-    }
+    ConfidenceGauge(
+        confidence = verdict.confidence,
+        certaintyLevel = verdict.certaintyLevel
+    )
+
+    Spacer(Modifier.height(16.dp))
 
     Box(
         modifier = Modifier
@@ -185,14 +204,7 @@ private fun VerdictResult(
 
     Spacer(Modifier.height(16.dp))
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        MetaChip("EVIDENCE", "${verdict.stances.size} PAPERS")
-        MetaChip("SUPPORT", "${verdict.supportingCount}")
-        MetaChip("OPPOSE", "${verdict.opposingCount}")
-    }
+    ConsensusIndicator(consensusInfo = verdict.consensusInfo)
 
     verdict.temporalWarning?.let { warning ->
         Spacer(Modifier.height(16.dp))
@@ -209,19 +221,38 @@ private fun VerdictResult(
 
     Spacer(Modifier.height(24.dp))
 
-    Text("EVIDENCE LIST [${verdict.stances.size}]", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
-    Spacer(Modifier.height(16.dp))
+    Text("EVIDENCE LIST [${sortedStances.size}]", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
+    Spacer(Modifier.height(12.dp))
+    
+    EvidenceFilterRow(
+        selectedFilter = selectedFilter,
+        onFilterChange = { selectedFilter = it },
+        selectedSort = selectedSort,
+        onSortChange = { selectedSort = it }
+    )
+    Spacer(Modifier.height(12.dp))
 
-    verdict.stances.sortedByDescending { it.paper.citationCount }.forEach { stance ->
-        EvidenceRow(stance = stance)
-        Spacer(Modifier.height(1.dp))
-        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(LocalFalcoPalette.current.divider))
-        Spacer(Modifier.height(1.dp))
+    if (sortedStances.isEmpty()) {
+        EmptyEvidenceState()
+    } else {
+        sortedStances.forEach { stance ->
+            EvidenceRow(paperStance = stance)
+        }
     }
+
+    Spacer(Modifier.height(24.dp))
+
+    TokenUsageCard(metadata = verdict.analysisMetadata)
 
     Spacer(Modifier.height(32.dp))
 
-    FalcoGhostButton("NEW CLAIM", onClick = onNewClaim)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        FalcoGhostButton("SHARE", onClick = { })
+        FalcoGhostButton("NEW CLAIM", onClick = onNewClaim, modifier = Modifier.weight(1f))
+    }
     Spacer(Modifier.height(80.dp))
 }
 
@@ -253,16 +284,7 @@ private fun ErrorResult(
 }
 
 @Composable
-private fun MetaChip(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
-        Spacer(Modifier.height(4.dp))
-        Text(value, style = FalcoTypography.bodySmall.copy(fontWeight = FontWeight.Medium), color = LocalFalcoPalette.current.textBody)
-    }
-}
-
-@Composable
-private fun StageList(state: VerificationState) {
+private fun StageList(state: VerificationState, stageStartTime: Long, currentTick: Long) {
     Text("VERIFICATION_STAGES", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
     Spacer(Modifier.height(16.dp))
 
@@ -273,6 +295,18 @@ private fun StageList(state: VerificationState) {
         is VerificationState.Error -> null
         is VerificationState.Idle -> null
     }
+    
+    val elapsedSeconds = if (state is VerificationState.InProgress) {
+        ((currentTick - stageStartTime) / 1000).toInt()
+    } else 0
+    
+    val elapsedText = if (elapsedSeconds > 0) {
+        "${elapsedSeconds}s elapsed"
+    } else null
+    
+    val progressInfo = if (state is VerificationState.InProgress && state.totalCount > 0) {
+        "${state.progressText} papers"
+    } else null
 
     allStages.forEachIndexed { index, stage ->
         val isComplete = currentStage != null && stage.ordinal < currentStage.ordinal
@@ -283,6 +317,8 @@ private fun StageList(state: VerificationState) {
             label = stage.name.replace("_", " "),
             status = when {
                 isComplete -> "COMPLETE"
+                isActive && progressInfo != null -> progressInfo
+                isActive && elapsedText != null -> elapsedText
                 isActive -> "PROCESSING"
                 else -> "PENDING"
             },
@@ -353,11 +389,23 @@ private fun StageRow(
 
 @Composable
 private fun RealTimeExtractionPanel(state: VerificationState) {
+    var showLog by remember { mutableStateOf(false) }
+    var messageLog by remember { mutableStateOf(listOf<Pair<Long, String>>()) }
+    
     val message = when (state) {
         is VerificationState.InProgress -> state.message
-        is VerificationState.Success -> null
         is VerificationState.Error -> state.message
+        is VerificationState.Success -> null
         is VerificationState.Idle -> "Awaiting input..."
+    }
+    
+    androidx.compose.runtime.LaunchedEffect(message) {
+        message?.let {
+            messageLog = messageLog + (System.currentTimeMillis() to it)
+            if (messageLog.size > 20) {
+                messageLog = messageLog.takeLast(20)
+            }
+        }
     }
 
     Box(
@@ -365,17 +413,59 @@ private fun RealTimeExtractionPanel(state: VerificationState) {
             .fillMaxWidth()
             .background(LocalFalcoPalette.current.surface)
             .border(1.dp, LocalFalcoPalette.current.divider, FalcoZeroShape)
-            .padding(16.dp)
     ) {
         Column {
-            Text("REAL-TIME_EXTRACTION", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
-            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showLog = !showLog }
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("REAL-TIME_EXTRACTION", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    if (showLog) "[- LOG]" else "[+ LOG]",
+                    style = FalcoTypography.labelSmall,
+                    color = LocalFalcoPalette.current.textMuted
+                )
+            }
 
-            Text(
-                message ?: "Awaiting input...",
-                style = FalcoTypography.bodySmall,
-                color = if (state is VerificationState.Error) LocalFalcoPalette.current.textMuted else LocalFalcoPalette.current.textBody
-            )
+            if (showLog && messageLog.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 16.dp)
+                        .background(LocalFalcoPalette.current.bg)
+                        .padding(8.dp)
+                ) {
+                    messageLog.takeLast(10).reversed().forEach { (_, msg) ->
+                        Row {
+                            Text(
+                                ">",
+                                style = FalcoTypography.labelMedium,
+                                color = LocalFalcoPalette.current.textGhost
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                msg,
+                                style = FalcoTypography.labelMedium,
+                                color = LocalFalcoPalette.current.textMuted
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                    }
+                }
+            } else {
+                Box(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        message ?: "Awaiting input...",
+                        style = FalcoTypography.bodySmall,
+                        color = if (state is VerificationState.Error) LocalFalcoPalette.current.textMuted else LocalFalcoPalette.current.textBody
+                    )
+                }
+            }
         }
     }
 }
@@ -446,12 +536,6 @@ private fun LiveMonitor() {
 
             Spacer(Modifier.height(8.dp))
 
-            Row {
-                Text("SIG.STRENGTH: 0.992  ", style = FalcoTypography.labelMedium, color = LocalFalcoPalette.current.textGhost)
-                Text("LATENCY: 0.04MS  ", style = FalcoTypography.labelMedium, color = LocalFalcoPalette.current.textGhost)
-                Text("14.2GB", style = FalcoTypography.labelMedium, color = LocalFalcoPalette.current.textGhost)
-            }
-
             if (showDebug && isDebugEnabled) {
                 Spacer(Modifier.height(12.dp))
                 Box(
@@ -474,10 +558,14 @@ private fun LiveMonitor() {
 }
 
 @Composable
-private fun FalcoGhostButton(label: String, onClick: () -> Unit) {
+private fun FalcoGhostButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = modifier
+            .then(Modifier.fillMaxWidth())
             .height(56.dp)
             .background(LocalFalcoPalette.current.bg)
             .border(1.dp, LocalFalcoPalette.current.textGhost, FalcoZeroShape)
@@ -489,72 +577,152 @@ private fun FalcoGhostButton(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun EvidenceRow(stance: com.najmi.falco.domain.model.PaperStance) {
-    var expanded by remember { mutableStateOf(false) }
-    val finalStance = stance.finalStance ?: stance.actorStance
-    val stanceTextColor = when (finalStance) {
-        Stance.SUPPORTS -> LocalFalcoPalette.current.stanceSupports
-        Stance.NEUTRAL -> LocalFalcoPalette.current.stanceNeutral
-        Stance.OPPOSES -> LocalFalcoPalette.current.stanceOpposes
-        Stance.INSUFFICIENT_EVIDENCE -> LocalFalcoPalette.current.textMuted
-    }
-    val groundingScore = stance.groundingScore ?: stance.confidence
-
+private fun EmptyEvidenceState() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { expanded = !expanded }
-            .padding(vertical = 12.dp)
+            .background(LocalFalcoPalette.current.surface)
+            .border(1.dp, LocalFalcoPalette.current.divider, FalcoZeroShape)
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("[${finalStance.name}]", style = FalcoTypography.labelSmall, color = stanceTextColor)
-            Spacer(Modifier.width(8.dp))
-            Text(
-                stance.paper.title.uppercase().take(50),
-                style = FalcoTypography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                color = LocalFalcoPalette.current.textPrimary
-            )
-            Spacer(Modifier.weight(1f))
-            Text("→", style = FalcoTypography.bodySmall, color = LocalFalcoPalette.current.textGhost)
-        }
-        Spacer(Modifier.height(4.dp))
-        Row {
-            Spacer(Modifier.width(24.dp))
-            Text(
-                "${stance.paper.authors.firstOrNull() ?: "Unknown"}, (${stance.paper.year ?: "N/A"}) · ${stance.paper.citationCount} citations",
-                style = FalcoTypography.labelMedium,
-                color = LocalFalcoPalette.current.textMuted
-            )
-        }
+        Text(
+            "[ ]",
+            style = FalcoTypography.displayLarge,
+            color = LocalFalcoPalette.current.textGhost
+        )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            "NO EVIDENCE FOUND",
+            style = FalcoTypography.labelSmall,
+            color = LocalFalcoPalette.current.textGhost
+        )
         Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Spacer(Modifier.width(24.dp))
-            Text("GROUNDING", style = FalcoTypography.labelSmall, color = LocalFalcoPalette.current.textGhost)
-            Spacer(Modifier.width(8.dp))
-            Text(
-                String.format("%.2f", groundingScore),
-                style = FalcoTypography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                color = LocalFalcoPalette.current.textBody
-            )
-        }
+        Text(
+            "No papers passed the quality gate for this claim",
+            style = FalcoTypography.bodySmall,
+            color = LocalFalcoPalette.current.textMuted
+        )
+    }
+}
 
-        if (expanded) {
-            Spacer(Modifier.height(8.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 24.dp)
-                    .background(LocalFalcoPalette.current.surface)
-                    .padding(12.dp)
-            ) {
-                Column {
-                    Text("ACTOR: ${stance.actorReasoning}", style = FalcoTypography.bodySmall, color = LocalFalcoPalette.current.textMuted)
-                    stance.criticChallenge?.let { challenge ->
-                        Spacer(Modifier.height(8.dp))
-                        Text("CRITIC: $challenge", style = FalcoTypography.bodySmall, color = LocalFalcoPalette.current.textGhost)
-                    }
-                }
-            }
+private enum class EvidenceSort {
+    CITATIONS, YEAR, GROUNDING
+}
+
+@Composable
+private fun EvidenceFilterRow(
+    selectedFilter: Stance?,
+    onFilterChange: (Stance?) -> Unit,
+    selectedSort: EvidenceSort,
+    onSortChange: (EvidenceSort) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        FilterChip(
+            label = "ALL",
+            selected = selectedFilter == null,
+            onClick = { onFilterChange(null) }
+        )
+        FilterChip(
+            label = "SUPPORT",
+            selected = selectedFilter == Stance.SUPPORTS,
+            onClick = { onFilterChange(if (selectedFilter == Stance.SUPPORTS) null else Stance.SUPPORTS) },
+            color = LocalFalcoPalette.current.stanceSupports
+        )
+        FilterChip(
+            label = "OPPOSE",
+            selected = selectedFilter == Stance.OPPOSES,
+            onClick = { onFilterChange(if (selectedFilter == Stance.OPPOSES) null else Stance.OPPOSES) },
+            color = LocalFalcoPalette.current.stanceOpposes
+        )
+        
+        Spacer(Modifier.weight(1f))
+        
+        SortDropdown(
+            selectedSort = selectedSort,
+            onSortChange = onSortChange
+        )
+    }
+}
+
+@Composable
+private fun FilterChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    color: androidx.compose.ui.graphics.Color = LocalFalcoPalette.current.textGhost
+) {
+    val palette = LocalFalcoPalette.current
+    Box(
+        modifier = Modifier
+            .background(
+                if (selected) palette.chip else palette.bg
+            )
+            .border(
+                1.dp,
+                if (selected) color else palette.divider,
+                FalcoZeroShape
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+    ) {
+        Text(
+            label,
+            style = FalcoTypography.labelSmall,
+            color = if (selected) color else palette.textGhost
+        )
+    }
+}
+
+@Composable
+private fun SortDropdown(
+    selectedSort: EvidenceSort,
+    onSortChange: (EvidenceSort) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val palette = LocalFalcoPalette.current
+    
+    Box {
+        Row(
+            modifier = Modifier
+                .clickable { expanded = !expanded }
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                when (selectedSort) {
+                    EvidenceSort.CITATIONS -> "CITATIONS"
+                    EvidenceSort.YEAR -> "YEAR"
+                    EvidenceSort.GROUNDING -> "GROUNDING"
+                },
+                style = FalcoTypography.labelSmall,
+                color = palette.textMuted
+            )
+            Spacer(Modifier.width(4.dp))
+            Text("▼", style = FalcoTypography.labelSmall, color = palette.textGhost)
+        }
+        
+        androidx.compose.material3.DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            androidx.compose.material3.DropdownMenuItem(
+                text = { Text("Citations") },
+                onClick = { onSortChange(EvidenceSort.CITATIONS); expanded = false }
+            )
+            androidx.compose.material3.DropdownMenuItem(
+                text = { Text("Year") },
+                onClick = { onSortChange(EvidenceSort.YEAR); expanded = false }
+            )
+            androidx.compose.material3.DropdownMenuItem(
+                text = { Text("Grounding") },
+                onClick = { onSortChange(EvidenceSort.GROUNDING); expanded = false }
+            )
         }
     }
 }
+

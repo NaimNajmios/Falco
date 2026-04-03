@@ -217,12 +217,14 @@ class IncrementalChunkAnalyzer @Inject constructor(
             chunks = singleChunkList
         )
 
-        val provider = preferredProvider ?: tieredProviderRouter.selectProvider(batchPrompt.estimatedInputTokens)
-        
-        val routeResult = tieredProviderRouter.routeWithFastFallback(
-            prompt = batchPrompt.prompt,
-            tokenCount = batchPrompt.estimatedInputTokens
-        )
+        val routeResult = if (preferredProvider != null) {
+            tieredProviderRouter.routeWithProvider(preferredProvider, batchPrompt.prompt)
+        } else {
+            tieredProviderRouter.routeWithFastFallback(
+                prompt = batchPrompt.prompt,
+                tokenCount = batchPrompt.estimatedInputTokens
+            )
+        }
 
         return routeResult.map { result ->
             val parsed = SmartStanceParser.parseWithFallback(result.response.text)

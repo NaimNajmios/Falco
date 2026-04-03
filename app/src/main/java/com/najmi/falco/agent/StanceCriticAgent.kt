@@ -1,5 +1,6 @@
 package com.najmi.falco.agent
 
+import android.util.Log
 import com.najmi.falco.data.remote.LlmProvider
 import com.najmi.falco.domain.model.PaperStance
 import com.najmi.falco.domain.model.Stance
@@ -21,6 +22,10 @@ class StanceCriticAgent @Inject constructor(
     private val json: Json
 ) : IFalcoAgent<StanceCriticInput, PaperStance> {
 
+    companion object {
+        private const val TAG = "StanceCriticAgent"
+    }
+
     override val agentName = "StanceCritic"
     override val defaultProvider = LlmProvider.GEMINI
 
@@ -32,9 +37,12 @@ class StanceCriticAgent @Inject constructor(
             
             routeResult.fold(
                 onSuccess = { response ->
-                    Result.success(parseResponse(response.text, input.paperStance))
+                    val providerUsed = response.usage.provider
+                    Log.d(TAG, "Critic request succeeded with provider: $providerUsed (preferred: ${provider.name})")
+                    Result.success(parseResponse(response.text, input.paperStance, providerUsed))
                 },
                 onFailure = { error ->
+                    Log.e(TAG, "Critic request failed with provider ${provider.name}: ${error.message}")
                     Result.failure(error)
                 }
             )
@@ -75,7 +83,7 @@ class StanceCriticAgent @Inject constructor(
         """.trimIndent()
     }
 
-    private fun parseResponse(raw: String, original: PaperStance): PaperStance {
+    private fun parseResponse(raw: String, original: PaperStance, providerUsed: String? = null): PaperStance {
         val cleaned = raw.trim()
             .removePrefix("```json").removePrefix("```")
             .removeSuffix("```").trim()
@@ -93,13 +101,15 @@ class StanceCriticAgent @Inject constructor(
             original.copy(
                 criticStance = revisedStance,
                 criticChallenge = challenge,
-                finalStance = finalStance
+                finalStance = finalStance,
+                criticProviderUsed = providerUsed
             )
         } catch (e: Exception) {
             original.copy(
                 criticStance = original.actorStance,
                 criticChallenge = "Critic evaluation failed, defaulting to actor stance.",
-                finalStance = original.actorStance
+                finalStance = original.actorStance,
+                criticProviderUsed = providerUsed
             )
         }
     }

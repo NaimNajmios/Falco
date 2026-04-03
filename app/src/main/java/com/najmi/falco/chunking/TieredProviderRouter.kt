@@ -158,6 +158,69 @@ class TieredProviderRouter @Inject constructor(
         return routeFor(prompt, tokenCount)
     }
 
+    suspend fun routeWithProvider(
+        preferredProvider: LlmProvider,
+        prompt: String
+    ): Result<RouteResult> {
+        Log.d(TAG, "Routing with preferred provider: ${preferredProvider.name}")
+        
+        if (!apiKeyProvider.hasUserKey(preferredProvider)) {
+            Log.w(TAG, "Preferred ${preferredProvider.name} has no API key, trying fallbacks")
+            return routeFor(prompt, prompt.split(" ").size * 2)
+        }
+
+        val quotaStatus = quotaManager.hasQuota(preferredProvider)
+        if (!quotaStatus.available) {
+            Log.w(TAG, "Preferred ${preferredProvider.name} quota unavailable: ${quotaStatus.reason}, trying fallbacks")
+            return routeFor(prompt, prompt.split(" ").size * 2)
+        }
+
+        val primaryResult = tryProviderWithRetry(preferredProvider, prompt, MAX_RETRIES)
+        if (primaryResult.isSuccess) {
+            return Result.success(RouteResult(
+                provider = preferredProvider,
+                response = primaryResult.getOrThrow(),
+                usedFallback = false
+            ))
+        }
+
+        Log.w(TAG, "Preferred ${preferredProvider.name} failed, trying fallback providers")
+        
+        val fallbackOrder = LlmProvider.entries.filter { 
+            it != preferredProvider && !isRateLimited(it) 
+        }
+        
+        for (fallback in fallbackOrder) {
+            if (!apiKeyProvider.hasUserKey(fallback)) continue
+            
+            val fallbackQuota = quotaManager.hasQuota(fallback)
+            if (!fallbackQuota.available) continue
+            
+            val fallbackResult = tryProviderWithRetry(fallback, prompt, MAX_RETRIES)
+            if (fallbackResult.isSuccess) {
+                Log.i(TAG, "Fallback ${fallback.name} succeeded for ${preferredProvider.name}")
+                return Result.success(RouteResult(
+                    provider = fallback,
+                    response = fallbackResult.getOrThrow(),
+                    usedFallback = true
+                ))
+            }
+            
+            if (isProviderExhaustedError(fallbackResult.exceptionOrNull())) {
+                quotaManager.markExhausted(fallback, fallbackResult.exceptionOrNull()?.message ?: "Provider exhausted")
+            }
+        }
+
+        Log.e(TAG, "All providers failed for preferred: ${preferredProvider.name}")
+        return Result.failure(
+            AllChunkingProvidersFailedException("All providers failed when preferring: ${preferredProvider.name}")
+        )
+    }
+
+    private fun isRateLimited(provider: LlmProvider): Boolean {
+        return false
+    }
+
     private suspend fun tryProvider(provider: LlmProvider, prompt: String): Result<LlmResponse> {
         val client = clients[provider] ?: return Result.failure(
             NoSuchElementException("No client for ${provider.name}")

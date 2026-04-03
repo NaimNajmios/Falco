@@ -3,7 +3,6 @@ package com.najmi.falco.ui.components
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,7 +29,6 @@ import androidx.compose.ui.unit.sp
 import com.najmi.falco.domain.model.PaperStance
 import com.najmi.falco.domain.model.Stance
 import com.najmi.falco.domain.model.VerificationStage
-import com.najmi.falco.ui.theme.FalcoZeroShape
 import com.najmi.falco.ui.theme.LocalFalcoPalette
 
 private fun stanceColorFor(stance: Stance, palette: com.najmi.falco.ui.theme.FalcoPalette): androidx.compose.ui.graphics.Color {
@@ -47,7 +45,7 @@ fun EvidenceRow(
     paperStance: PaperStance,
     modifier: Modifier = Modifier,
     expanded: Boolean = false,
-    onToggle: () -> Unit = {}
+    @Suppress("UNUSED_PARAMETER") onToggle: () -> Unit = {}
 ) {
     val palette = LocalFalcoPalette.current
     var isExpanded by remember { mutableStateOf(expanded) }
@@ -156,6 +154,16 @@ fun EvidenceRow(
                             color = palette.textMuted
                         )
                     }
+                }
+
+                if (paperStance.chunksAnalyzed.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    var chunksExpanded by remember { mutableStateOf(false) }
+                    ChunksExplorer(
+                        chunks = paperStance.chunksAnalyzed,
+                        expanded = chunksExpanded,
+                        onToggle = { chunksExpanded = !chunksExpanded }
+                    )
                 }
             }
         }

@@ -132,4 +132,9 @@ class ProviderRouter @Inject constructor(
         Log.e(TAG, "All ${failedProviders.size} configured providers failed")
         return Result.failure(AllProvidersFailedException())
     }
+
+    suspend fun routeWithProvider(preferred: LlmProvider, prompt: String): Result<LlmResponse> {
+        Log.d(TAG, "RouteWithProvider: attempting ${preferred.name} first")
+        return routeFor(prompt, preferred)
+    }
 }
