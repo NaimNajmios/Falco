@@ -12,7 +12,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -28,8 +29,14 @@ import androidx.activity.compose.BackHandler
 import com.najmi.falco.domain.model.Stance
 import com.najmi.falco.domain.model.Verdict
 import com.najmi.falco.ui.components.ConfidenceFactorsTooltips
-import com.najmi.falco.ui.components.ConfidenceSegmentBar
-import com.najmi.falco.ui.components.EvidenceRow
+import com.najmi.falco.ui.components.DebugPanel
+import com.najmi.falco.ui.components.EvidenceBaseSummaryBar
+import com.najmi.falco.ui.components.PaperStanceCard
+import com.najmi.falco.ui.components.SearchStrategySection
+import com.najmi.falco.ui.components.StanceDistributionBar
+import com.najmi.falco.ui.components.VerdictFactorsPanel
+import com.najmi.falco.ui.components.VerdictHeroSection
+import com.najmi.falco.ui.components.ClaimAnatomyCard
 import com.najmi.falco.ui.components.FalcoMetaRow
 import com.najmi.falco.ui.components.ProvenanceFooter
 import com.najmi.falco.ui.components.ShareBottomSheet
@@ -48,14 +55,13 @@ fun VerdictDetailScreen(
     onSave: () -> Unit = {}
 ) {
     val palette = LocalFalcoPalette.current
-    val stanceColor = when (verdict.lean) {
-        Stance.SUPPORTS -> palette.stanceSupports
-        Stance.NEUTRAL -> palette.stanceNeutral
-        Stance.OPPOSES -> palette.stanceOpposes
-        Stance.INSUFFICIENT_EVIDENCE -> palette.textMuted
-    }
     
-    var showShareSheet by androidx.compose.runtime.mutableStateOf(false)
+    var showShareSheet by remember { mutableStateOf(false) }
+    var isVerdictExpanded by remember { mutableStateOf(false) }
+    var isSearchStrategyExpanded by remember { mutableStateOf(false) }
+    var isFactorsExpanded by remember { mutableStateOf(false) }
+    var activeStanceFilter by remember { mutableStateOf<Stance?>(null) }
+    var activeQueryFilter by remember { mutableStateOf<String?>(null) }
 
     BackHandler(enabled = true) {
         onBack()
@@ -85,20 +91,76 @@ fun VerdictDetailScreen(
 
         Spacer(Modifier.height(24.dp))
 
-        Text(
-            "VERDICT",
-            style = FalcoTypography.labelSmall,
-            color = palette.textGhost
+        VerdictHeroSection(
+            verdict = verdict,
+            isExpanded = isVerdictExpanded,
+            onToggleExpand = { isVerdictExpanded = !isVerdictExpanded }
         )
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(24.dp))
 
-        Text(verdict.lean.name, style = FalcoTypography.displayLarge, color = stanceColor)
+        if (verdict.claimAnalysis != null) {
+            Spacer(Modifier.height(16.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(palette.surface)
+                    .border(1.dp, palette.divider, FalcoZeroShape)
+                    .padding(16.dp)
+            ) {
+                ClaimAnatomyCard(claimAnalysis = verdict.claimAnalysis)
+            }
+        }
 
-        Spacer(Modifier.height(16.dp))
+        if (verdict.factorScores.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isFactorsExpanded = !isFactorsExpanded }
+                    .background(palette.surface)
+                    .border(1.dp, palette.divider, FalcoZeroShape)
+                    .padding(16.dp)
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "VERDICT FACTORS",
+                            style = FalcoTypography.labelSmall,
+                            color = palette.textGhost
+                        )
+                        Text(
+                            if (isFactorsExpanded) "▼" else "▶",
+                            style = FalcoTypography.labelSmall,
+                            color = palette.textMuted
+                        )
+                    }
+                    if (isFactorsExpanded) {
+                        Spacer(Modifier.height(12.dp))
+                        VerdictFactorsPanel(factorScores = verdict.factorScores)
+                    }
+                }
+            }
+        }
 
-        if (verdict.lean == Stance.INSUFFICIENT_EVIDENCE) {
-            verdict.caveat?.let { caveat ->
+        if (verdict.retrievalSummary.totalFetched > 0 || verdict.expandedQueries.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(palette.surface)
+                    .border(1.dp, palette.divider, FalcoZeroShape)
+                    .padding(16.dp)
+            ) {
+                EvidenceBaseSummaryBar(retrievalSummary = verdict.retrievalSummary)
+            }
+
+            if (verdict.expandedQueries.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -106,20 +168,18 @@ fun VerdictDetailScreen(
                         .border(1.dp, palette.divider, FalcoZeroShape)
                         .padding(16.dp)
                 ) {
-                    Text(caveat, style = FalcoTypography.bodySmall, color = palette.textMuted)
+                    SearchStrategySection(
+                        expandedQueries = verdict.expandedQueries,
+                        isExpanded = isSearchStrategyExpanded,
+                        onToggleExpand = { isSearchStrategyExpanded = !isSearchStrategyExpanded },
+                        onQueryFilter = { activeQueryFilter = it },
+                        activeQueryFilter = activeQueryFilter
+                    )
                 }
             }
-            Spacer(Modifier.height(16.dp))
-        } else {
-            ConfidenceSegmentBar(confidence = verdict.confidence)
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "${(verdict.confidence * 100).toInt()}% CONFIDENCE",
-                style = FalcoTypography.labelSmall,
-                color = palette.textMuted
-            )
-            Spacer(Modifier.height(8.dp))
         }
+
+        Spacer(Modifier.height(16.dp))
 
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(palette.divider))
 
@@ -131,20 +191,6 @@ fun VerdictDetailScreen(
         ) {
             FalcoMetaRow("LATENCY", "${verdict.analysisMetadata.analysisDurationMs}ms")
             FalcoMetaRow("METADATA", "${verdict.totalPapersPassedGate} passed · ${verdict.totalPapersRetrieved} retrieved")
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        verdict.temporalWarning?.let { warning ->
-            Spacer(Modifier.height(16.dp))
-            Box(
-                modifier = Modifier.fillMaxWidth()
-                    .background(palette.surface)
-                    .border(1.dp, palette.chip, FalcoZeroShape)
-                    .padding(12.dp)
-            ) {
-                Text(warning, style = FalcoTypography.bodySmall, color = palette.textMuted)
-            }
         }
 
         val allFactors = verdict.stances.flatMap { it.confidenceFactors }.distinctBy { it.type + it.value }
@@ -161,7 +207,7 @@ fun VerdictDetailScreen(
             UncertaintySection(uncertaintyInfo = totalUncertainty)
         }
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(32.dp))
 
         Text("Synthesis of grounding data.", style = FalcoTypography.headlineMedium, color = palette.textPrimary)
         Spacer(Modifier.height(16.dp))
@@ -177,11 +223,57 @@ fun VerdictDetailScreen(
 
         Spacer(Modifier.height(32.dp))
 
-        Text("EVIDENCE LIST [N=${verdict.totalPapersPassedGate}]", style = FalcoTypography.labelSmall, color = palette.textGhost)
+        StanceDistributionBar(
+            supportingCount = verdict.supportingCount,
+            opposingCount = verdict.opposingCount,
+            neutralCount = verdict.neutralCount,
+            activeFilter = activeStanceFilter,
+            onFilterChange = { activeStanceFilter = it }
+        )
+
         Spacer(Modifier.height(16.dp))
 
-        verdict.stances.sortedByDescending { it.paper.citationCount }.forEach { stance ->
-            EvidenceRow(paperStance = stance)
+        val filteredStances = remember(verdict.stances, activeStanceFilter, activeQueryFilter) {
+            var filtered = verdict.stances
+
+            if (activeStanceFilter != null) {
+                filtered = filtered.filter {
+                    (it.finalStance ?: it.actorStance) == activeStanceFilter
+                }
+            }
+
+            if (activeQueryFilter != null) {
+                filtered = filtered.filter { true }
+            }
+
+            filtered.sortedByDescending { it.confidence }
+        }
+
+        if (filteredStances.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(palette.surface)
+                    .border(1.dp, palette.chip, FalcoZeroShape)
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "No papers match this filter",
+                    style = FalcoTypography.bodyMedium,
+                    color = palette.textMuted
+                )
+            }
+        } else {
+            filteredStances.forEach { stance ->
+                var isExpanded by remember { mutableStateOf(false) }
+                PaperStanceCard(
+                    paperStance = stance,
+                    isExpanded = isExpanded,
+                    onToggleExpand = { isExpanded = !isExpanded }
+                )
+                Spacer(Modifier.height(12.dp))
+            }
         }
 
         val primaryProvider = verdict.stances.firstOrNull()?.providerUsed
@@ -190,6 +282,14 @@ fun VerdictDetailScreen(
         Spacer(Modifier.height(24.dp))
 
         ProvenanceFooter(
+            metadata = verdict.analysisMetadata,
+            providerUsed = primaryProvider ?: "unknown",
+            modelUsed = primaryModel
+        )
+
+        Spacer(Modifier.height(24.dp))
+
+        DebugPanel(
             metadata = verdict.analysisMetadata,
             providerUsed = primaryProvider ?: "unknown",
             modelUsed = primaryModel
@@ -254,5 +354,3 @@ private fun ActionButton(
         )
     }
 }
-
-

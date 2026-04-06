@@ -6,6 +6,7 @@ data class Verdict(
     val lean: Stance,
     val confidence: Float,
     val summary: String,
+    val verdictNarrative: String = "",
     val stances: List<PaperStance>,
     val totalPapersRetrieved: Int,
     val totalPapersPassedGate: Int,
@@ -17,7 +18,12 @@ data class Verdict(
     val completedAt: Long = System.currentTimeMillis(),
     val analysisMetadata: AnalysisMetadata = AnalysisMetadata(),
     val uncertaintyInfo: UncertaintyInfo = UncertaintyInfo(),
-    val caveat: String? = null
+    val caveat: String? = null,
+    val factorScores: Map<VerdictFactor, Float> = emptyMap(),
+    val conflictDetected: Boolean = false,
+    val claimAnalysis: ClaimAnalysis? = null,
+    val expandedQueries: List<ExpandedQuery> = emptyList(),
+    val retrievalSummary: RetrievalSummary = RetrievalSummary()
 ) {
     val consensusInfo: ConsensusInfo
         get() = ConsensusInfo(
