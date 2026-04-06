@@ -43,7 +43,13 @@ FALCO's core is a dynamic, multi-stage pipeline managed by the `FalcoOrchestrato
 ## ✨ Advanced Features
 
 -   **Deep Evidence Synthesis**: The **Verdict Detail** screen provides a deep-dive into synthesis quality, evidence tiers, and provider provenance.
--   **Evidence-Backed History**: Persistent **Dossier** history with stance-lean visualizations and confidence segment bars.
+-   **Advanced Dossier Management**: The **Dossier** screen provides a comprehensive, highly-organized view of past verifications:
+    -   **Full-Text Search**: Instantly find past claims using keyword search.
+    -   **Favorites & Filtering**: "Star" critical verifications and filter the history list to show only favorites.
+    -   **Intelligent Sorting**: Organize history by Newest, Oldest, or Highest Confidence.
+    -   **Stance-Lean Visualization**: Quick-glance indicators for SUPPORTS, OPPOSES, and NEUTRAL stances.
+-   **Data Portability**: Users can export their entire verification history (claims, verdicts, S/O/N counts) as a structured **JSON file** via the Android Sharesheet.
+-   **Intelligent Optimization**: Early-stopping stance analysis and incremental chunking for cost-effective verification.
 -   **Security**: **AES256-GCM/SIV** encrypted storage for all sensitive API keys.
 -   **Premium UI/UX**: Sleek, dark-themed interface built with Jetpack Compose.
 
