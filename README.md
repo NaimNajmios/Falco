@@ -10,6 +10,16 @@ FALCO is a high-performance Android application designed to verify complex claim
 
 In an era of information overload, FALCO provides a rigorous, automated framework for academic fact-checking. It doesn't just search; it **reasons**, **filters**, **challenges**, and **synthesizes** information from scientific literature to provide a definitive, evidence-backed verdict on any hypothesis.
 
+## 🔍 End-to-End Pipeline Signal Propagation
+
+Unlike traditional "black box" AI systems, FALCO aggressively surfaces its intermediate reasoning to the user. The pipeline's decision-making process is fully propagated to the UI, providing unprecedented transparency:
+
+-   **Claim Anatomy Card**: Visualizes how the pipeline classified the claim—showing the claim type, confidence rings, and ambiguity warnings.
+-   **Search Strategy Expansion**: Detailed overview of the expanded queries (Broad, Narrow, Contrastive) used during retrieval and their respective result coverage.
+-   **Evidence Base Summary**: A transparent breakdown of the source split, source health badges, and calculated evidence quality metrics.
+-   **Stance Distribution**: Visual stacked bars and confidence histograms that clearly illustrate where the gathered evidence aligns (Supports/Neutral/Opposes) and flag scientific conflicts.
+-   **Verdict Factors Breakdown**: A detailed analysis of the aggregator's weighting logic (Evidence Volume, Consensus Strength, etc.) combined with a plain-English verdict narrative.
+
 ## ⚙️ Consumer-Grade Configuration
 
 -   **Dynamic Provider Ecosystem**: Integrated support for a diverse fleet of LLM providers including **Gemini**, **Groq**, **Cerebras**, **OpenRouter**, **Mistral**, **Cohere**, and **Routeway**.
@@ -38,11 +48,11 @@ FALCO's core is a dynamic, multi-stage pipeline managed by the `FalcoOrchestrato
 7.  **Cross-Reference Engine**: Identifies consensus and flags outlier evidence.
 8.  **Stance Critic (Devil's Advocate)**: Challenges initial classifications to prevent bias.
 9.  **Algorithmic Grounding**: Automated verification of reasoning against metadata.
-10. **Adaptive Retrieval Loop**: Autonomous search-verify cycles if the initial data is insufficient.
+10. **Adaptive Retrieval Loop**: Autonomous search-verify cycles if initial data is insufficient.
 
 ## ✨ Advanced Features
 
--   **Deep Evidence Synthesis**: The **Verdict Detail** screen provides a deep-dive into synthesis quality, evidence tiers, and provider provenance.
+-   **Verdict Hero Section**: An animated and rich visual presentation of the final verdict, providing immediate and authoritative clarity.
 -   **Advanced Dossier Management**: The **Dossier** screen provides a comprehensive, highly-organized view of past verifications:
     -   **Full-Text Search**: Instantly find past claims using keyword search.
     -   **Favorites & Filtering**: "Star" critical verifications and filter the history list to show only favorites.
@@ -57,7 +67,7 @@ FALCO's core is a dynamic, multi-stage pipeline managed by the `FalcoOrchestrato
 
 -   **Language**: Kotlin
 -   **UI Framework**: Jetpack Compose (Material 3)
--   **Architecture**: Clean Architecture + MVVM + Agent-Oriented Design
+-   **Architecture**: Clean Architecture + MVVM + Domain Model Propagation
 -   **Security**: AndroidX Crypto (MasterKey & EncryptedSharedPreferences)
 -   **Persistence**: Room (Dossier history, Quota tracking, and Claims)
 -   **Remote**: Ktor (Multiplatform-ready HTTP client)
