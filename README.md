@@ -37,18 +37,22 @@ Unlike traditional "black box" AI systems, FALCO aggressively surfaces its inter
 
 ## Self-Correcting Orchestration Pipeline
 
-FALCO's core is a dynamic, multi-stage pipeline managed by the `FalcoOrchestrator`:
+FALCO's core is a highly dynamic, multi-stage pipeline managed by the `FalcoOrchestrator`, designed for resilience and cost-efficiency:
 
-1.  **Claim Classifier**: Analyzes technical nuances and claim types.
-2.  **Query Expander**: Generates optimized academic search queries.
-3.  **Multi-Source Retrieval**: Interfaces with **OpenAlex** and **Semantic Scholar**.
-4.  **Paper Quality Gate**: Field-aware scoring (citations, open-access, depth).
-5.  **Temporal Freshness Analysis**: Time-aware alerts for rapidly evolving fields.
-6.  **Smart Stance Actor**: Incremental chunk analysis with **Early Stopping** for cost efficiency.
-7.  **Cross-Reference Engine**: Identifies consensus and flags outlier evidence.
-8.  **Stance Critic (Devil's Advocate)**: Challenges initial classifications to prevent bias.
-9.  **Algorithmic Grounding**: Automated verification of reasoning against metadata.
-10. **Adaptive Retrieval Loop**: Autonomous search-verify cycles if initial data is insufficient.
+1.  **Claim Classifier & Dynamic Provider Assignment**: Analyzes technical nuances to identify the claim type. Uses an `ActorCriticProviderSelector` to dynamically assign an optimal primary LLM (Actor) and challenger LLM (Critic), along with fallback providers based on the claim's domain.
+2.  **Query Expander**: Generates optimized, contrastive academic search queries.
+3.  **Multi-Source Retrieval**: Interfaces concurrently with academic databases like **OpenAlex** and **Semantic Scholar**.
+4.  **Paper Quality Gate**: Field-aware algorithmic scoring that filters evidence based on citation thresholds, open-access availability, and depth.
+5.  **Temporal Freshness Analysis**: Checks evidence dates to generate time-aware alerts for rapidly evolving scientific fields.
+6.  **Smart Stance Actor**: Streams papers through a concurrent `PaperBackpressureQueue` to evaluate stances. Uses incremental chunk analysis with **Early Stopping** to minimize token usage, actively tracking and reporting token efficiency savings against full-text analysis.
+7.  **Cross-Reference Engine**: Evaluates stances collectively to identify scientific consensus and flag outlier evidence.
+8.  **Stance Critic (Devil's Advocate)**: Challenges the Actor's classifications to prevent confirmation bias. Features a robust **Fallback Mechanism** that automatically routes to alternative LLM providers if the primary Critic fails or hits rate limits.
+9.  **Algorithmic Grounding**: Automated verification of the AI's reasoning against the original paper abstracts to prevent hallucination.
+10. **Aggregator & Deep Adaptive Retrieval**: Synthesizes the final verdict. If the evidence is deemed insufficient (low confidence or conflicting consensus), it triggers an **Adaptive Retrieval Loop**, generating new suggested queries and re-running the entire sub-pipeline (Quality Gate → Grounding) up to 2 times. The pipeline concludes by generating an `UncertaintyInfo` report to highlight any remaining evidence gaps or quality warnings.
+
+### Concurrency & Resilience
+- **Backpressure Queuing**: The pipeline manages API throughput using Kotlin Coroutines and backpressure queues, preventing rate-limit exhaustion when processing dozens of papers simultaneously.
+- **Provider Fallbacks**: Critical reasoning stages (like the Stance Critic) are fault-tolerant, seamlessly falling back to secondary providers (e.g., from Cerebras to Groq to Gemini) to ensure the verification succeeds even if an API goes down.
 
 ## Advanced Features
 
