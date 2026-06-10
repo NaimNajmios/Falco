@@ -6,11 +6,11 @@
 
 FALCO is a high-performance Android application designed to verify complex claims using a sophisticated, self-correcting multi-agent orchestration pipeline. By leveraging diverse academic databases and a fleet of advanced LLMs, FALCO bridges the gap between casual claims and peer-reviewed empirical evidence.
 
-## 🚀 Vision
+## Vision
 
 In an era of information overload, FALCO provides a rigorous, automated framework for academic fact-checking. It doesn't just search; it **reasons**, **filters**, **challenges**, and **synthesizes** information from scientific literature to provide a definitive, evidence-backed verdict on any hypothesis.
 
-## 🔍 End-to-End Pipeline Signal Propagation
+## End-to-End Pipeline Signal Propagation
 
 Unlike traditional "black box" AI systems, FALCO aggressively surfaces its intermediate reasoning to the user. The pipeline's decision-making process is fully propagated to the UI, providing unprecedented transparency:
 
@@ -20,7 +20,7 @@ Unlike traditional "black box" AI systems, FALCO aggressively surfaces its inter
 -   **Stance Distribution**: Visual stacked bars and confidence histograms that clearly illustrate where the gathered evidence aligns (Supports/Neutral/Opposes) and flag scientific conflicts.
 -   **Verdict Factors Breakdown**: A detailed analysis of the aggregator's weighting logic (Evidence Volume, Consensus Strength, etc.) combined with a plain-English verdict narrative.
 
-## ⚙️ Consumer-Grade Configuration
+## Consumer-Grade Configuration
 
 -   **Dynamic Provider Ecosystem**: Integrated support for a diverse fleet of LLM providers including **Gemini**, **Groq**, **Cerebras**, **OpenRouter**, **Mistral**, **Cohere**, and **Routeway**.
 -   **Real-Time Key Validation**: A sophisticated validation system that ensures API keys are functional with a live connectivity test before saving.
@@ -29,13 +29,13 @@ Unlike traditional "black box" AI systems, FALCO aggressively surfaces its inter
     -   **Debug Mode**: Toggleable diagnostic logging for full operational transparency.
     -   **Preferred Provider Selection**: High-level control over the system's primary agentic backbone.
 
-## 🛡 Production-Grade Infrastructure
+## Production-Grade Infrastructure
 
 -   **Background Orchestration**: The `VerificationForegroundService` ensures verifications are resilient to OS process management, continuing even when the app is minimized.
 -   **Real-Time Progress Tracking**: Live updates on pipeline stages and processing counts via Android notifications.
 -   **Operational Transparency**: A granular `DebugLogger` system tracking network latency, LLM token metrics, and pipeline stage benchmarks.
 
-## 🧠 Self-Correcting Orchestration Pipeline
+## Self-Correcting Orchestration Pipeline
 
 FALCO's core is a dynamic, multi-stage pipeline managed by the `FalcoOrchestrator`:
 
@@ -50,7 +50,7 @@ FALCO's core is a dynamic, multi-stage pipeline managed by the `FalcoOrchestrato
 9.  **Algorithmic Grounding**: Automated verification of reasoning against metadata.
 10. **Adaptive Retrieval Loop**: Autonomous search-verify cycles if initial data is insufficient.
 
-## ✨ Advanced Features
+## Advanced Features
 
 -   **Verdict Hero Section**: An animated and rich visual presentation of the final verdict, providing immediate and authoritative clarity.
 -   **Advanced Dossier Management**: The **Dossier** screen provides a comprehensive, highly-organized view of past verifications:
@@ -63,7 +63,7 @@ FALCO's core is a dynamic, multi-stage pipeline managed by the `FalcoOrchestrato
 -   **Security**: **AES256-GCM/SIV** encrypted storage for all sensitive API keys.
 -   **Premium UI/UX**: Sleek, dark-themed interface built with Jetpack Compose.
 
-## 🛠 Tech Stack
+## Tech Stack
 
 -   **Language**: Kotlin
 -   **UI Framework**: Jetpack Compose (Material 3)
@@ -75,7 +75,7 @@ FALCO's core is a dynamic, multi-stage pipeline managed by the `FalcoOrchestrato
 -   **Dependency Injection**: Hilt
 -   **Asynchrony**: Kotlin Coroutines & Flow
 
-## 📦 Getting Started
+## Getting Started
 
 ### Prerequisites
 
